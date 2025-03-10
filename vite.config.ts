@@ -14,5 +14,8 @@ export default defineConfig({
   server: {
     open: true, 
   },
+  optimizeDeps: {
+    exclude: ["pyodide"], // ✅ Exclude Pyodide from optimization
+  },
 });
 

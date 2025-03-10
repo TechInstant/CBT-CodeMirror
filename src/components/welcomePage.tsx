@@ -31,7 +31,7 @@ const WelcomePage: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center text-center">
+      <div className="flex-1 flex flex-col items-center justify-center text-center z-0">
         <div className="w-2/3">
           <h1 className="text-2xl font-semibold mb-6">Welcome Nuel</h1>
           <button 

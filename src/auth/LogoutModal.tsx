@@ -7,19 +7,24 @@ interface LogoutModalProps {
 
 const LogoutModal: React.FC<LogoutModalProps> = ({ onClose, onConfirm }) => {
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-0 backdrop-blur-sm">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-80 text-center border border-gray-300">
-        <h2 className="text-lg font-semibold text-gray-800">Confirm Logout</h2>
-        <p className="text-gray-600 mt-2">Are you sure you want to log out?</p>
-        <div className="flex justify-between mt-4">
+    <div className="fixed inset-0 flex justify-center items-center z-50">
+      {/* Modal Container */}
+      <div className="bg-white border border-gray-300 rounded-lg shadow-lg p-6 w-96">
+        <p className="text-lg font-semibold text-center">Confirm Logout</p>
+        <p className="text-gray-600 text-center mt-2">
+          Are you sure you want to log out?
+        </p>
+
+        {/* Buttons: Properly Centered */}
+        <div className="mt-4 flex justify-center gap-4">
           <button
-            className="px-4 py-2 bg-gray-300 rounded-md hover:bg-gray-400"
+            className="px-5 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition"
             onClick={onClose}
           >
             Cancel
           </button>
           <button
-            className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-700"
+            className="px-5 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition"
             onClick={onConfirm}
           >
             Yes, Logout
