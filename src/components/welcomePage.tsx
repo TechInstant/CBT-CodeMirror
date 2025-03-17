@@ -24,7 +24,7 @@ const WelcomePage: React.FC = () => {
         <button className="w-full py-2 bg-white text-gray-700 rounded-md font-semibold">
           Practice Questions
         </button>
-        <button className="w-full py-2 bg-white text-gray-700 rounded-md">Profile</button>
+        {/* <button className="w-full py-2 bg-white text-gray-700 rounded-md">Profile</button> */}
         <button className="w-full py-2 bg-white text-gray-700 rounded-md" onClick={openModal}>
           Log out
         </button>
