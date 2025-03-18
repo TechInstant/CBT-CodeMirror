@@ -28,12 +28,12 @@ const StudentLogin: React.FC = () => {
         .required("Password is required"),
     }),
     onSubmit: async (values) => {
-      setError(""); // Clear previous errors
+      setError(""); 
 
       const { username, password } = values;
 
+       // Admin login using email & password
       if (username.includes("@")) {
-        // Admin login using email & password
         try {
           await signInWithEmailAndPassword(auth, username, password);
           navigate("/admin-dashboard");
@@ -41,7 +41,6 @@ const StudentLogin: React.FC = () => {
           setError("Invalid email or password. Please try again.");
         }
       } else {
-        // Student login using surname & matric number
         try {
           const usersRef = collection(db, "users");
           const q = query(usersRef, where("lastName", "==", username), where("userId", "==", password));
@@ -61,16 +60,15 @@ const StudentLogin: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white">
-      {/* Header Section */}
       <div className="w-full bg-blue-600 py-4 text-center text-white text-xl font-bold">
         CBT
       </div>
 
       {/* Login Form */}
       <div className="w-full max-w-md p-8 bg-blue-50 rounded-lg shadow-md mt-10">
-        <h2 className="text-center text-lg font-semibold text-gray-900 mb-4">
+        <p className="text-center text-lg font-semibold text-gray-900 mb-4">
           LOGIN
-        </h2>
+        </p>
 
         <form className="space-y-4" onSubmit={formik.handleSubmit}>
           {/* Username Field */}
