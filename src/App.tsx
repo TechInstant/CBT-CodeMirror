@@ -4,6 +4,7 @@ import WelcomePage from './components/welcomePage';
 import CodeSection from './components/codeSection';
 import AdminUpload from './components/AdminUpload';
 import AdminDashboard from './components/AdminDashboard';
+import axios from 'axios';
 
 function App() {
   return (
@@ -23,3 +24,26 @@ function App() {
 }
 
 export default App;
+
+  export const GetToken = async () => {
+        try {
+          const response = await axios.post(
+            "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" +
+              import.meta.env.VITE_REACT_APP_API_KEY,
+            {
+              email: import.meta.env.VITE_REACT_APP_EMAIL,
+              password: import.meta.env.VITE_REACT_APP_PASSWORD,
+              returnSecureToken: true,
+            }
+          );
+      
+          const idToken = response?.data?.idToken;
+          localStorage.setItem("idToken", idToken);
+      
+          return idToken;
+        } catch (error: any) {
+          console.log(error.message);
+        }
+      };
+
+  
