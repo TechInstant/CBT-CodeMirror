@@ -16,7 +16,7 @@ function App() {
           <Route path="/welcomePage" element={<WelcomePage />} />
           <Route path="/codesection" element={<CodeSection />} />
           <Route path="/adminUpload" element={<AdminUpload />} />
-          <Route path="/adminDashboard" element={<AdminDashboard />} />
+          <Route path="/AdminDashboard" element={<AdminDashboard />} />
         </Routes>
       </div>
     </Router>
@@ -25,6 +25,7 @@ function App() {
 
 export default App;
 
+  export const baseUrl = import.meta.env.VITE_REACT_APP_BASEURL;
   export const GetToken = async () => {
         try {
           const response = await axios.post(

@@ -11,7 +11,7 @@ import { useFormik } from "formik";
 import * as Yup from "yup";
 import { app } from "../firebase";
 import axios from "axios";
-import { GetToken } from "../App";
+import { baseUrl, GetToken } from "../App";
 import { SignUpForm } from "./adminSignup";
 
 const auth = getAuth(app);
@@ -36,10 +36,10 @@ const StudentLogin: React.FC = () => {
   useEffect(() => {
     const GetUser = async () => {
       try {
-        const idToken = await GetToken(); // Ensure GetToken() is defined and properly imported
+        const idToken = await GetToken(); 
 
         const response = await axios.get<User[]>(
-          "https://doyenifycbt-enas3l3ehq-uc.a.run.app/users",
+          `${baseUrl}/users`,
           {
             headers: {
               Authorization: `Bearer ${idToken}`,
@@ -52,7 +52,7 @@ const StudentLogin: React.FC = () => {
       }
     };
 
-    GetUser(); // Call the function inside useEffect
+    GetUser(); 
   }, []);
 
   const formik = useFormik({
@@ -78,7 +78,6 @@ const StudentLogin: React.FC = () => {
           return;
         }
     
-        // Proceed with Firebase authentication
         try {
           await signInWithEmailAndPassword(auth, values.username, values.password);
           navigate("/adminupload"); 
@@ -103,8 +102,8 @@ const StudentLogin: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
-      <div className="w-full bg-blue-600 py-4 text-center text-white text-xl font-bold">
+    <div className="max-h-screen flex flex-col items-center justify-center bg-white">
+      <div className="w-full bg-blue-400 py-4 text-center text-white text-xl font-bold">
         CBT
       </div>
 
@@ -125,7 +124,6 @@ const StudentLogin: React.FC = () => {
     </p>
 
     <form className="space-y-4" onSubmit={formik.handleSubmit}>
-      {/* Username Field */}
       <div>
         <label className="block text-sm font-medium text-gray-700">
           Username (Surname) or Email
@@ -152,7 +150,6 @@ const StudentLogin: React.FC = () => {
         )}
       </div>
 
-            {/* Password Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Password (Matric No.)
@@ -184,13 +181,9 @@ const StudentLogin: React.FC = () => {
                 </p>
               )}
             </div>
-
-            {/* Error Message */}
             {error && (
               <p className="text-red-500 text-sm text-center">{error}</p>
             )}
-
-            {/* Login Button */}
             <button
               type="submit"
               className="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
