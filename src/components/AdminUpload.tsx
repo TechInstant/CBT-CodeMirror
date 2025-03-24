@@ -93,7 +93,7 @@ const AdminUpload: React.FC = () => {
         questions: questionsData,
         createdAt: new Date().toISOString(),
       };
-      console.log("Sending Questions Payload:", JSON.stringify(questions, null, 2)); 
+      console.log("Sending Questions Payload:", JSON.stringify(questions, null, 1)); 
       await axios.post(`${baseUrl}/questions`, questions, {
         headers: { 
           Authorization: `Bearer ${idToken}`,
@@ -103,7 +103,7 @@ const AdminUpload: React.FC = () => {
       toast.success("Data uploaded successfully!");
       navigate("/AdminDashboard");
     } catch (error) {
-      console.error("Upload Error:", error);
+      console.error(`Error uploading ${questionsData}:`, error);
       toast.error("Error uploading data.");
     }
   };
@@ -138,7 +138,7 @@ const AdminUpload: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {studentsData.slice(0, 3).map((row, index) => (
+                    {studentsData.slice(0, 1).map((row, index) => (
                       <tr key={index} className="border">
                         {Object.values(row).map((value, idx) => (
                           <td key={idx} className="border p-2">{value as string}</td>
@@ -175,7 +175,7 @@ const AdminUpload: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {questionsData.slice(0, 3).map((row, index) => (
+                    {questionsData.slice(0, 1).map((row, index) => (
                       <tr key={index} className="border">
                         {Object.values(row).map((value, idx) => (
                           <td key={idx} className="border p-2">{value as string}</td>

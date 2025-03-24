@@ -36,13 +36,13 @@ const StudentLogin: React.FC = () => {
   useEffect(() => {
     const GetUser = async () => {
       try {
-        const idToken = await GetToken(); 
-
+        const idToken = await GetToken();
+  
         const response = await axios.get<User[]>(
-          `${baseUrl}/users`,
+          `${baseUrl}/users`, // Ensure proper string interpolation
           {
             headers: {
-              Authorization: `Bearer ${idToken}`,
+              Authorization: `Bearer ${idToken}`, // Correct header format
             },
           }
         );
@@ -51,9 +51,10 @@ const StudentLogin: React.FC = () => {
         console.error("Error fetching user:", error);
       }
     };
-
-    GetUser(); 
+  
+    GetUser();
   }, []);
+  
 
   const formik = useFormik({
     initialValues: { username: "", password: "" },

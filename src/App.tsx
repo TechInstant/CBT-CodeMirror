@@ -1,15 +1,18 @@
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import StudentLogin from './auth/studentLogin';
 import WelcomePage from './components/welcomePage';
-import CodeSection from './components/codeSection';
+import CodeSection from './components/Editor';
 import AdminUpload from './components/AdminUpload';
 import AdminDashboard from './components/AdminDashboard';
 import axios from 'axios';
+import { AuthProvider } from './Context/AuthContext';
 
 function App() {
   return (
+    
     <Router>
       <div>
+      <AuthProvider>
         <Routes>
         <Route path="/" element={<StudentLogin />} />
           <Route path="/studentLogin" element={<StudentLogin />} />  
@@ -18,6 +21,7 @@ function App() {
           <Route path="/adminUpload" element={<AdminUpload />} />
           <Route path="/AdminDashboard" element={<AdminDashboard />} />
         </Routes>
+        </AuthProvider>
       </div>
     </Router>
   );
