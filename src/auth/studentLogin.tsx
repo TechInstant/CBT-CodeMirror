@@ -39,10 +39,10 @@ const StudentLogin: React.FC = () => {
         const idToken = await GetToken();
   
         const response = await axios.get<User[]>(
-          `${baseUrl}/users`, // Ensure proper string interpolation
+          `${baseUrl}/users`, 
           {
             headers: {
-              Authorization: `Bearer ${idToken}`, // Correct header format
+              Authorization: `Bearer ${idToken}`, 
             },
           }
         );
@@ -59,7 +59,7 @@ const StudentLogin: React.FC = () => {
   const formik = useFormik({
     initialValues: { username: "", password: "" },
     validationSchema: Yup.object({
-      username: Yup.string().required("Username or Email is required"),
+      username: Yup.string().required("Matric Numner is required"),
       password: Yup.string().required("Password is required"),
     }),
 
@@ -88,8 +88,8 @@ const StudentLogin: React.FC = () => {
       } else {
         const matchedUser = data.find(
           (user) =>
-            user.LastName.toLowerCase() === values.username.toLowerCase() &&
-            user.UserId === values.password
+            user.UserId === values.username && 
+            user.LastName.toLowerCase() === values.password.toLowerCase()
         );
     
         if (matchedUser) {
