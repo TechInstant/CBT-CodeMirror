@@ -14,7 +14,7 @@ const AdminUpload: React.FC = () => {
   const [studentsData, setStudentsData] = useState<any[]>([]);
   const [questionsData, setQuestionsData] = useState<any[]>([]);
   const [courseTitle, setCourseTitle] = useState("");
-  const [timer, setTimer] = useState("00:01:00"); 
+  const [timer, setTimer] = useState(""); 
 
   const navigate = useNavigate();
 
@@ -46,13 +46,16 @@ const AdminUpload: React.FC = () => {
                   };
                 });
                 setStudentsData(formattedStudents);
-                toast.success("Students file processed successfully!");
+                console.log(formattedStudents)
+                // toast.success("Students file successfully uploaded");
               } else {
-                const formattedQuestions = results.data.map((question: any) => ({
-                  questionText: question.QUESTIONS || "",
-                }));
-                setQuestionsData(formattedQuestions);
-                toast.success("Questions file processed successfully!");
+                let questionsArray:any = []
+                results.data.map((question: any) => {
+                  // questionText: question.QUESTIONS || "",
+                  questionsArray.push(question.QUESTIONS)
+                });
+                setQuestionsData(questionsArray);
+                // toast.success("Questions file processed successfully!");
               }
             },
           });
@@ -82,18 +85,18 @@ const AdminUpload: React.FC = () => {
           await axios.post(`${baseUrl}/students`, student, {
             headers: { Authorization: `Bearer ${idToken}` },
           });
-          await new Promise((resolve) => setTimeout(resolve, 200));
+          // await new Promise((resolve) => setTimeout(resolve, 200));
         } catch (error) {
           console.error(`Error uploading ${student.StudentId}:`, error);
         }
       }
       const questions = {
-        courseTitle,
-        timer,
-        questions: questionsData,
-        createdAt: new Date().toISOString(),
+        CourseTitle: courseTitle,
+        Duration: Number(timer),
+        Questions: questionsData,
+        CourseCode: "",
       };
-      console.log("Sending Questions Payload:", JSON.stringify(questions, null, 1)); 
+      // console.log("Sending Questions Payload:", JSON.stringify(questions, null, 1));
       await axios.post(`${baseUrl}/questions`, questions, {
         headers: { 
           Authorization: `Bearer ${idToken}`,
@@ -194,8 +197,8 @@ const AdminUpload: React.FC = () => {
             <p className="mb-2 text-sm font-semibold">Step 3: Enter Course Details</p>
             <label className="block text-sm font-medium text-gray-700">Course Title</label>
             <input type="text" className="w-full border rounded-md p-2 mt-2" placeholder="Enter course title" value={courseTitle} onChange={(e) => setCourseTitle(e.target.value)} />
-            <label className="block text-sm font-medium text-gray-700 mt-4">Set Timer</label>
-            <input type="time" step="1" className="w-full border rounded-md p-2 mt-2" value={timer} onChange={(e) => setTimer(e.target.value)} />
+            <label className="block text-sm font-medium text-gray-700 mt-4">Set Duration {`(in minutes)`}</label>
+            <input type="number" className="w-full border rounded-md p-2 mt-2" value={timer} onChange={(e) => setTimer(e.target.value)}/>
           </>
         )}
 

@@ -83,7 +83,7 @@ useEffect(() => {
         if (!matchedAdmin) {
           setError("Account not found. Please check your email or sign up.");
           setTimeout(() => {
-            setShowSignUp(false);
+            setShowSignUp(true);
           }, 1500);
           return;
         }
