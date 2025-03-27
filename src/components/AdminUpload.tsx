@@ -37,7 +37,7 @@ const AdminUpload: React.FC = () => {
                 const formattedStudents = results.data.map((student: any) => {
                   const names = student.Names ? student.Names.split(" ") : ["", ""];
                   return {
-                    UserId: student.MatricNo || " ",
+                    StudentId: student.MatricNo || " ",
                     FirstName: names[1] || " ",
                     LastName: names[0] || " ",
                     Department: student.Department || " ",
@@ -79,12 +79,12 @@ const AdminUpload: React.FC = () => {
       const idToken = await GetToken();
       for (const student of studentsData) {
         try {
-          await axios.post(`${baseUrl}/users`, student, {
+          await axios.post(`${baseUrl}/students`, student, {
             headers: { Authorization: `Bearer ${idToken}` },
           });
           await new Promise((resolve) => setTimeout(resolve, 200));
         } catch (error) {
-          console.error(`Error uploading ${student.UserId}:`, error);
+          console.error(`Error uploading ${student.StudentId}:`, error);
         }
       }
       const questions = {

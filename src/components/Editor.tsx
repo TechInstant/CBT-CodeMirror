@@ -99,7 +99,7 @@ const CodeSection: React.FC = () => {
       autoClose: 3000,
     });
     setTimeout(() => {
-      window.location.href = "/studentLogin";
+      window.location.href = "/";
     }, 3500);
   };
 

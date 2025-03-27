@@ -66,7 +66,7 @@ export const SignUpForm = () => {
           }
         );
 
-        navigate("/adminupload"); 
+        navigate("/StudentLogin"); 
       } catch (error) {
         console.log("Error creating user:", error);
 

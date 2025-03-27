@@ -18,6 +18,15 @@ const auth = getAuth(app);
 // const db = getFirestore(app);
 
 interface User {
+  StudentId: string;
+  FirstName: string;
+  LastName: string;
+  Department: string;
+  Email?: string;
+  Role: string;
+}
+
+interface User {
   UserId: string;
   FirstName: string;
   LastName: string;
@@ -29,33 +38,34 @@ interface User {
 const StudentLogin: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [data, setData] = useState<User[]>([]);
   const [showSignUp, setShowSignUp] = useState(false);
   const navigate = useNavigate();
+  const [studentData, setStudentData] = useState<User[]>([]);
+const [adminData, setAdminData] = useState<User[]>([]);
 
-  useEffect(() => {
-    const GetUser = async () => {
-      try {
-        const idToken = await GetToken();
-  
-        const response = await axios.get<User[]>(
-          `${baseUrl}/users`, 
-          {
-            headers: {
-              Authorization: `Bearer ${idToken}`, 
-            },
-          }
-        );
-        setData(response.data);
-      } catch (error) {
-        console.error("Error fetching user:", error);
-      }
-    };
-  
-    GetUser();
-  }, []);
-  
+useEffect(() => {
+  const fetchUsers = async () => {
+    try {
+      const idToken = await GetToken();
 
+      const studentResponse = await axios.get<User[]>(`${baseUrl}/students`, {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      setStudentData(studentResponse.data);
+
+      const adminResponse = await axios.get<User[]>(`${baseUrl}/users`, {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      setAdminData(adminResponse.data);
+
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+  };
+
+  fetchUsers();
+}, []);
+  
   const formik = useFormik({
     initialValues: { username: "", password: "" },
     validationSchema: Yup.object({
@@ -66,40 +76,44 @@ const StudentLogin: React.FC = () => {
     onSubmit: async (values) => {
       setError("");
     
-      const isAdmin = values.username.includes("@"); 
-    
+      const isAdmin = values.username.includes("@");
+
       if (isAdmin) {
-        const matchedUser = data.find(user => user.Email === values.username);
-    
-        if (!matchedUser) {
+        const matchedAdmin = adminData.find(user => user.Email === values.username);
+        if (!matchedAdmin) {
           setError("Account not found. Please check your email or sign up.");
           setTimeout(() => {
-            setShowSignUp(true);
+            setShowSignUp(false);
           }, 1500);
           return;
         }
     
         try {
           await signInWithEmailAndPassword(auth, values.username, values.password);
-          navigate("/adminupload"); 
+          localStorage.setItem("FirstName", matchedAdmin.FirstName);
+          localStorage.setItem("LastName", matchedAdmin.LastName);
+
+          navigate("/AdminDashboard");
         } catch (authError) {
           setError("Invalid email or password.");
         }
       } else {
-        const matchedUser = data.find(
-          (user) =>
-            user.UserId === values.username && 
-            user.LastName.toLowerCase() === values.password.toLowerCase()
+        const matchedStudent = studentData.find(
+          user => user.StudentId === values.username &&
+                  user.LastName.toLowerCase() === values.password.toLowerCase()
         );
     
-        if (matchedUser) {
+        if (matchedStudent) {
+          localStorage.setItem("FirstName", matchedStudent.FirstName);
+          localStorage.setItem("LastName", matchedStudent.LastName);
+          localStorage.setItem("Department", matchedStudent.Department);
           navigate("/welcomepage");
         } else {
           setError("Invalid username or password.");
         }
       }
-    },
-    
+    }
+        
   });
 
   return (
@@ -127,7 +141,7 @@ const StudentLogin: React.FC = () => {
     <form className="space-y-4" onSubmit={formik.handleSubmit}>
       <div>
         <label className="block text-sm font-medium text-gray-700">
-          Username (Surname) or Email
+          Username Matric No.
         </label>
         <div className="relative mt-1">
           <span className="absolute inset-y-0 left-3 flex items-center text-gray-500">
@@ -137,7 +151,7 @@ const StudentLogin: React.FC = () => {
             type="text"
             name="username"
             className="w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-            placeholder="Enter your username or email"
+            placeholder="Enter your matric number"
             onChange={formik.handleChange}
             onBlur={formik.handleBlur}
             value={formik.values.username}
@@ -153,7 +167,7 @@ const StudentLogin: React.FC = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Password (Matric No.)
+                Password 
               </label>
               <div className="relative mt-1">
                 <span className="absolute inset-y-0 left-3 flex items-center text-gray-500">
@@ -163,7 +177,7 @@ const StudentLogin: React.FC = () => {
                   type={showPassword ? "text" : "password"}
                   name="password"
                   className="w-full pl-10 pr-10 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  placeholder="e.g., CSC/2000/100"
+                  placeholder="e.g., surname"
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
                   value={formik.values.password}

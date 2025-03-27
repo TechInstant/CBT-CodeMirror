@@ -6,6 +6,7 @@ import AdminUpload from './components/AdminUpload';
 import AdminDashboard from './components/AdminDashboard';
 import axios from 'axios';
 import { AuthProvider } from './Context/AuthContext';
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   return (
@@ -15,11 +16,14 @@ function App() {
       <AuthProvider>
         <Routes>
         <Route path="/" element={<StudentLogin />} />
-          <Route path="/studentLogin" element={<StudentLogin />} />  
+        
+          <Route element={<ProtectedRoute />}>
+          <Route path="/AdminDashboard" element={<AdminDashboard />} />
+          <Route path="/" element={<StudentLogin />} />  
           <Route path="/welcomePage" element={<WelcomePage />} />
           <Route path="/codesection" element={<CodeSection />} />
           <Route path="/adminUpload" element={<AdminUpload />} />
-          <Route path="/AdminDashboard" element={<AdminDashboard />} />
+          </Route>
         </Routes>
         </AuthProvider>
       </div>

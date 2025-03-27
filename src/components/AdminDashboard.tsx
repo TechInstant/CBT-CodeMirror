@@ -1,92 +1,120 @@
+import { useState, useEffect } from "react";
+import axios from "axios";
+import { baseUrl, GetToken } from "../App";
+import { CSVLink } from "react-csv";
+import { useNavigate } from "react-router-dom";
 
+type User = {
+  UserId: string;
+  StudentId: string;
+  FirstName: string;
+  LastName: string;
+  Department: string;
+  Email: string;
+  Scores: number;
+};
 
 const AdminDashboard = () => {
-  const user = {
-    name: "admin",
-    email: "admin@codemirror.com",
-  };
+  const navigate = useNavigate();
+  const [students, setStudentData] = useState<User[]>([]);
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [firstName, setFirstName] = useState(localStorage.getItem("FirstName") || "");
+  const [LastName, setLastName] = useState(localStorage.getItem("LastName") || "");
 
-  const stats = {
-    attempted: 25,
-    totalQuestions: 30,
-    solved: 15,
-    timeTaken: "18m 00s",
-    totalTime: "1hr 20mins",
-  };
+  useEffect(() => {
+    const storedFirstName = localStorage.getItem("FirstName");
+  const storedLastName = localStorage.getItem("LastName");
 
-  const sections = [
-    { section: "Section 1", questions: 3, attempted: 2, solved: 1, time: "0 hr 0 min 16 sec" },
-    { section: "Section 2", questions: 5, attempted: 4, solved: 3, time: "0 hr 0 min 55 sec" },
-    { section: "Section 3", questions: 4, attempted: 4, solved: 1, time: "0 hr 0 min 19 sec" },
-    { section: "Section 4", questions: 2, attempted: 2, solved: 2, time: "0 hr 0 min 4 sec" },
-    { section: "Section 5", questions: 5, attempted: 5, solved: 1, time: "0 hr 1 min 17 sec" },
-    { section: "Section 6", questions: 5, attempted: 3, solved: 3, time: "0 hr 3 min 1 sec" },
-    { section: "Section 7", questions: 1, attempted: 1, solved: 1, time: "0 hr 2 min 1 sec" },
-    { section: "Section 8", questions: 5, attempted: 4, solved: 3, time: "0 hr 2 min 4 sec" },
-  ];
+  if (storedFirstName) setFirstName(storedFirstName);
+  if (storedLastName) setLastName(storedLastName);
+  }, []);
+
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const idToken = await GetToken();
+        
+              const studentResponse = await axios.get<User[]>(`${baseUrl}/students`, {
+                headers: { Authorization: `Bearer ${idToken}` },
+              });
+              setStudentData(studentResponse.data);
+              
+      } catch (error) {
+        console.error("Error fetching students:", error);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("FirstName");
+    localStorage.removeItem("LastName");
+    localStorage.removeItem("Department");
+    navigate("/"); 
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <div className="bg-blue-700 text-white py-3 px-6 flex justify-between items-center">
-        <h1 className="text-xl font-bold">CM CodeMirror</h1>
-        <nav className="space-x-4">
-          <a href="#" className="hover:underline">My Tests</a>
-          <a href="#" className="hover:underline">My Questions</a>
-          <a href="#" className="hover:underline">Report +</a>
+    <div className="flex min-h-screen bg-gray-100">
+      <aside className="w-64 bg-blue-700 text-white p-4">
+        <h1 className="text-2xl font-bold mb-4">CSCM CodeMirror</h1>
+        <nav className="space-y-2">
+          <button onClick={() => setActiveTab("dashboard")} className="block w-full text-left p-2 hover:bg-blue-600 rounded">Dashboard</button>
+          <button onClick={() => setActiveTab("Questions")} className="block w-full text-left p-2 hover:bg-blue-600 rounded">Questions</button>
+          <button onClick={() => setActiveTab("students")} className="block w-full text-left p-2 hover:bg-blue-600 rounded">Students</button>
+          <a href="/adminupload" className="block p-2 hover:bg-blue-600 rounded">Upload</a>
+          <button onClick={handleLogout} className="block w-full text-left p-2 bg-blue-300 hover:bg-blue-600 rounded mt-10">Logout</button>
         </nav>
-        <div className="text-sm">
-          <p>{user.name}</p>
-          <p className="text-gray-300">{user.email}</p>
-        </div>
-      </div>
+      </aside>
 
-      {/* Statistics Overview */}
-      <div className="max-w-4xl mx-auto mt-8 p-6 bg-white shadow-md rounded-md">
-        <button className="w-full py-2 bg-gray-800 text-white font-semibold rounded-md mb-4">
-          STATISTICS OVERVIEW
-        </button>
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div className="p-4 bg-gray-200 rounded-md">
-            <p className="text-xl font-bold">{stats.attempted}</p>
-            <p className="text-gray-600">Attempted out of {stats.totalQuestions}</p>
-          </div>
-          <div className="p-4 bg-gray-200 rounded-md">
-            <p className="text-xl font-bold">{stats.solved}</p>
-            <p className="text-gray-600">Solved of {stats.attempted}</p>
-          </div>
-          <div className="p-4 bg-gray-200 rounded-md">
-            <p className="text-xl font-bold">{stats.timeTaken}</p>
-            <p className="text-gray-600">Time taken of {stats.totalTime}</p>
-          </div>
-        </div>
-      </div>
+      {/* Main Content */}
+      <div className="flex-1 p-6">
+      {activeTab === "dashboard" && (
+  <div>
+    <h2 className="text-xl font-bold mb-4">Dashboard Overview</h2>
+    <div className="bg-white p-4 shadow-md rounded">
+      <p className="text-center text-2xl font-bold"> Welcome {`${firstName} ${LastName}`}</p>
+      <p className="text-center text-lg font-semibold mt-4">Total Students: {students.length}</p>
+    </div>
+  </div> // Removed the extra curly brace here
+)}
 
-      {/* Table */}
-      <div className="max-w-4xl mx-auto mt-6 p-6 bg-white shadow-md rounded-md">
-        <table className="w-full border-collapse border border-gray-300">
-          <thead>
-            <tr className="bg-gray-200">
-              <th className="border p-2">QUESTION(S)</th>
-              <th className="border p-2">ATTEMPTED</th>
-              <th className="border p-2">SOLVED</th>
-              <th className="border p-2">TIME TAKEN</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sections.map((sec, index) => (
-              <tr key={index} className="text-center border-b">
-                <td className="border p-2">{sec.section}</td>
-                <td className="border p-2">{sec.attempted}</td>
-                <td className="border p-2">{sec.solved}</td>
-                <td className="border p-2">{sec.time}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {activeTab === "students" && (
+          <div>
+            <p className="text-xl font-bold mb-4">Student List</p>
+            <div className="bg-white p-4 shadow-md rounded">
+              <table className="w-full border-collapse border border-gray-300">
+                <thead>
+                  <tr className="bg-gray-200">
+                    <th className="border p-2">First Name</th>
+                    <th className="border p-2">Last Name</th>
+                    <th className="border p-2">Matric No.</th>
+                    <th className="border p-2">Department</th>
+                    <th className="border p-2">Email</th>
+                    <th className="border p-2">Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((student, index) => (
+                    <tr key={index} className="text-center border-b">
+                      <td className="border p-2">{student.FirstName}</td>
+                      <td className="border p-2">{student.LastName}</td>
+                      <td className="border p-2">{student.StudentId}</td>
+                      <td className="border p-2">{student.Department}</td>
+                      <td className="border p-2">{student.Email}</td>
+                      <td className="border p-2">{student.Scores}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="mt-4">
+                <CSVLink data={students} filename="students_results.csv" className="bg-green-500 text-white p-2 rounded">Download Results</CSVLink>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
-};
-
+}
 export default AdminDashboard;

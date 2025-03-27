@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import LogoutModal from "../auth/LogoutModal"; 
 
 const WelcomePage: React.FC = () => {
@@ -8,8 +8,20 @@ const WelcomePage: React.FC = () => {
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
+  const [firstName, setFirstName] = useState<string | null>("");
+  const [lastName, setLastName] = useState<string | null>("");
+  const [Department, setDepartment] = useState<string | null>("");
+
+  useEffect(() => {
+    setFirstName(localStorage.getItem("FirstName"));
+    setLastName(localStorage.getItem("LastName"));
+    setDepartment(localStorage.getItem("Department"));
+  }, []);
   
   const handleLogout = () => {
+    localStorage.removeItem("FirstName");
+    localStorage.removeItem("LastName");
+    localStorage.removeItem("Department")
     closeModal();
     navigate("/studentLogin"); 
   };
@@ -18,13 +30,12 @@ const WelcomePage: React.FC = () => {
     <div className="flex h-screen relative">
       {/* Sidebar */}
       <div className="w-1/4 bg-blue-600 p-4 flex flex-col space-y-4 min-h-screen">
-        <button className="w-full py-2 bg-white text-gray-700 rounded-md" onClick={() => navigate("/studentLogin")}>
+        <button className="w-full py-2 bg-white text-gray-700 rounded-md" onClick={() => navigate("/")}>
           Home
         </button>
         <button className="w-full py-2 bg-white text-gray-700 rounded-md font-semibold">
           Practice Questions
         </button>
-        {/* <button className="w-full py-2 bg-white text-gray-700 rounded-md">Profile</button> */}
         <button className="w-full py-2 bg-white text-gray-700 rounded-md" onClick={openModal}>
           Log out
         </button>
@@ -32,18 +43,18 @@ const WelcomePage: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center text-center z-0">
-        <div className="w-2/3">
-          <h1 className="text-2xl font-semibold mb-6">Welcome Nuel</h1>
+      <div className="w-2/3 bg-white p-6 rounded-lg shadow-lg">
+          <p className="text-center text-2xl font-bold mb-4">Welcome</p>
+          <p className="text-lg font-semibold">Name: {firstName ? `${firstName} ${lastName}` : "Student"}</p>
+          <p className="text-lg font-semibold">Department: {Department ? Department : "Not Available"}</p>
           <button 
-            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 p-2 mt-4"
             onClick={() => navigate("/codesection")} 
           >
             Start Practicing
           </button>
         </div>
       </div>
-
-      {/* Show Modal Only When isModalOpen is True */}
       {isModalOpen && <LogoutModal onClose={closeModal} onConfirm={handleLogout} />}
     </div>
   );
