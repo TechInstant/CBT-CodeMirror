@@ -1,7 +1,7 @@
 import { Navigate, Outlet } from "react-router-dom";
 
 const ProtectedRoute = () => {
-  const isAuthenticated = !!localStorage.getItem("FirstName"); // Check if user data exists
+  const isAuthenticated = !!localStorage.getItem("userData"); // Check if user data exists
 
   return isAuthenticated ? <Outlet /> : <Navigate to="/" />;
 };

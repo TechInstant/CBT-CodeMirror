@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import StudentLogin from './auth/studentLogin';
+import Login from './auth/Login';
 import WelcomePage from './components/welcomePage';
 import CodeSection from './components/Editor';
 import AdminUpload from './components/AdminUpload';
@@ -15,11 +15,11 @@ function App() {
       <div>
       <AuthProvider>
         <Routes>
-        <Route path="/" element={<StudentLogin />} />
+        <Route path="/" element={<Login />} />
         
           <Route element={<ProtectedRoute />}>
           <Route path="/AdminDashboard" element={<AdminDashboard />} />
-          <Route path="/" element={<StudentLogin />} />  
+          <Route path="/" element={<Login />} />  
           <Route path="/welcomePage" element={<WelcomePage />} />
           <Route path="/codesection" element={<CodeSection />} />
           <Route path="/adminUpload" element={<AdminUpload />} />

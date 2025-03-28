@@ -45,7 +45,7 @@ export const SignUpForm = () => {
           values.email,
           values.password
         );
-       
+        console.log("User Created in Firebase:", userCredential.user);
         const idToken = await userCredential.user.getIdToken();
         const firebaseUser = userCredential.user;
 
@@ -58,15 +58,10 @@ export const SignUpForm = () => {
           Department: " "
         };
 
-        await axios.post(
-          `${baseUrl}/users`,
-          newUser,
-          {
-            headers: { Authorization: `Bearer ${idToken}` }, 
-          }
-        );
-
-        navigate("/StudentLogin"); 
+        await axios
+        .post(`${baseUrl}/users`, newUser, {
+          headers: { Authorization: `Bearer ${idToken}` },})
+        navigate("/"); 
       } catch (error) {
         console.log("Error creating user:", error);
 

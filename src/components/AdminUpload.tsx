@@ -41,6 +41,7 @@ const AdminUpload: React.FC = () => {
                     FirstName: names[1] || " ",
                     LastName: names[0] || " ",
                     Department: student.Department || " ",
+                    Password: student.Password || " ",
                     Role: "Student",
                     Email: " ",
                   };

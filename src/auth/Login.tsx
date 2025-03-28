@@ -17,16 +17,19 @@ import { SignUpForm } from "./adminSignup";
 const auth = getAuth(app);
 // const db = getFirestore(app);
 
-interface User {
+export interface User {
   StudentId: string;
   FirstName: string;
   LastName: string;
   Department: string;
   Email?: string;
   Role: string;
+  Password: string;
+  Reset?: string;
+  Scores?: number
 }
 
-interface User {
+export interface Admin {
   UserId: string;
   FirstName: string;
   LastName: string;
@@ -41,79 +44,92 @@ const StudentLogin: React.FC = () => {
   const [showSignUp, setShowSignUp] = useState(false);
   const navigate = useNavigate();
   const [studentData, setStudentData] = useState<User[]>([]);
-const [adminData, setAdminData] = useState<User[]>([]);
+const [adminData, setAdminData] = useState<Admin[]>([]);
+
+const [loading, setLoading] = useState(true);
 
 useEffect(() => {
   const fetchUsers = async () => {
     try {
       const idToken = await GetToken();
-
       const studentResponse = await axios.get<User[]>(`${baseUrl}/students`, {
         headers: { Authorization: `Bearer ${idToken}` },
       });
       setStudentData(studentResponse.data);
-
-      const adminResponse = await axios.get<User[]>(`${baseUrl}/users`, {
+      const adminResponse = await axios.get<Admin[]>(`${baseUrl}/users`, {
         headers: { Authorization: `Bearer ${idToken}` },
       });
       setAdminData(adminResponse.data);
-
     } catch (error) {
-      console.error("Error fetching users:", error);
+      
+    } finally {
+      setLoading(false); 
     }
   };
 
   fetchUsers();
 }, []);
+
   
   const formik = useFormik({
     initialValues: { username: "", password: "" },
     validationSchema: Yup.object({
-      username: Yup.string().required("Matric Numner is required"),
+      username: Yup.string().required("Matric Number is required"),
       password: Yup.string().required("Password is required"),
     }),
 
     onSubmit: async (values) => {
       setError("");
     
+      if (loading) {
+        setError("Data is still loading. Please wait...");
+        return;
+      }
+    
       const isAdmin = values.username.includes("@");
-
+    
       if (isAdmin) {
+        console.log("Checking for admin account...");
+    
+        if (!adminData || adminData.length === 0) {
+          setError("Admin data is missing. Try again later.");
+          return;
+        }
+    
         const matchedAdmin = adminData.find(user => user.Email === values.username);
         if (!matchedAdmin) {
           setError("Account not found. Please check your email or sign up.");
-          setTimeout(() => {
-            setShowSignUp(true);
-          }, 1500);
           return;
         }
     
         try {
-          await signInWithEmailAndPassword(auth, values.username, values.password);
-          localStorage.setItem("FirstName", matchedAdmin.FirstName);
-          localStorage.setItem("LastName", matchedAdmin.LastName);
-
-          navigate("/AdminDashboard");
+          const userCredential = await signInWithEmailAndPassword(auth, values.username, values.password);
+          console.log("Admin signed in:", userCredential.user);
+          localStorage.setItem("userData", JSON.stringify(matchedAdmin))
+          navigate("/AdminDash"); //correct this
         } catch (authError) {
+          console.error("Sign-in failed:", authError);
           setError("Invalid email or password.");
         }
       } else {
+    
+        if (!studentData || studentData.length === 0) {
+          setError("Student data is missing. Try again later.");
+          return;
+        }
+    
         const matchedStudent = studentData.find(
           user => user.StudentId === values.username &&
                   user.LastName.toLowerCase() === values.password.toLowerCase()
         );
     
-        if (matchedStudent) {
-          localStorage.setItem("FirstName", matchedStudent.FirstName);
-          localStorage.setItem("LastName", matchedStudent.LastName);
-          localStorage.setItem("Department", matchedStudent.Department);
-          navigate("/welcomepage");
-        } else {
-          setError("Invalid username or password.");
+        if (matchedStudent){
+          localStorage.setItem("userData", JSON.stringify(matchedStudent))
+          navigate("/welcomePage")
         }
       }
     }
-        
+    
   });
 
   return (

@@ -8,17 +8,25 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import { material } from "@uiw/codemirror-theme-material";
 import { dracula } from "@uiw/codemirror-theme-dracula";
 import { loadPyodide } from "pyodide";
+import axios from "axios";
+import { baseUrl, GetToken } from "../App";
+// import { formatString } from "../components/FormatString"; 
+
 
 const CodeSection: React.FC = () => {
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [consoleOutput, setConsoleOutput] = useState<string>("");
   const [code, setCode] = useState<string>("print('Hello, World!')");
   const [timeLeft, setTimeLeft] = useState(3600);
-  // const [worker, setWorker] = useState<Worker | null>(null);
   const [theme, setTheme] = useState(oneDark);
   const [language, setLanguage] = useState(python());
   const [pyodide, setPyodide] = useState<any>(null);
-
+  // interface Question {
+  //   Questions: string[];
+  // }
+  // const [questions, setQuestions] = useState<Question[]>([]);
+  // const [assignedQuestion, setAssignedQuestion] = useState<string>("");
+  // const [studentId, setStudentId] = useState<string>("");
   const themeMap: Record<string, any> = {
     "one-dark": oneDark,
     "material": material,
@@ -33,6 +41,7 @@ const CodeSection: React.FC = () => {
     const loadPython = async () => {
       try {
         const pyInstance = await loadPyodide();
+        pyInstance.setStdout({batched: handleOutput})
         setPyodide(pyInstance);
       } catch (error) {
         console.error("Failed to load Pyodide:", error);
@@ -40,20 +49,7 @@ const CodeSection: React.FC = () => {
     };
     loadPython();
   }, []);
-  // useEffect(() => {
-  //   const newWorker = new Worker("/pyWorker.js");
-  //   newWorker.onmessage = (event) => {
-  //     const { type, data } = event.data;
-  //     if (type === "output") {
-  //       setConsoleOutput(data);
-  //     } else if (type === "error") {
-  //       setConsoleOutput(`Error: ${data}`);
-  //     }
-  //   };
-  //   setWorker(newWorker);
-  //   return () => newWorker.terminate();
-  // }, []);
-
+ 
   useEffect(() => {
     if (timeLeft <= 0) {
       handleSubmit();
@@ -63,21 +59,68 @@ const CodeSection: React.FC = () => {
     return () => clearInterval(timer);
   }, [timeLeft]);
 
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      try {
+        const idToken = await GetToken(); 
+        const questionResponse = await axios.get(`${baseUrl}/questions`, {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+  
+        // setQuestions(questionResponse.data);
+        console.log("Questions:", questionResponse.data);
+      } catch (error) {
+        console.error("Error fetching questions:", error);
+      }
+    };
+  
+    const fetchStudentId = () => {
+      const userData = localStorage.getItem("userData");
+      if (userData) {
+        // const parsedData = JSON.parse(userData); 
+        // setStudentId(parsedData.StudentId);
+      }
+    };
+  
+    fetchQuestions();
+    fetchStudentId();
+  }, []);
+  
+  // useEffect(() => {
+  //   if (questions.length > 0 && studentId) {
+  //     const numericPart = studentId.replace(/\D/g, ""); 
+  //     const studentIndex = parseInt(numericPart, 10) % questions.length; 
+  //     const studentQuestions = questions[studentIndex]?.Questions || [];
+  
+  //       let randomIndex: number | null = null;
+
+  //     if (studentQuestions.length > 0) {
+  //       randomIndex = Math.floor(Math.random() * studentQuestions.length);
+  //       setAssignedQuestion(studentQuestions[randomIndex]);
+  //     } else {
+  //       setAssignedQuestion("No question available for this student.");
+  //     }
+  
+  //     console.log("Extracted Number:", numericPart);
+  //     console.log("Student Index:", studentIndex);
+  //     console.log("Assigned Question Index:", randomIndex);
+  //   }
+  // }, [questions, studentId]);
+  
+  
+  
+
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // const handleRunCode = () => {
-  //   setConsoleOpen(true);
-  //   if (!worker) {
-  //     setConsoleOutput("Python runtime is still loading...");
-  //     return;
-  //   }
-  //   worker.postMessage({ code });
-  // };
+ 
 
+  const handleOutput = (output: string) => {
+    console.log(output);
+  }
   const handleRunCode = async () => {
     setConsoleOpen(true);
     if (!pyodide) {
@@ -87,6 +130,8 @@ const CodeSection: React.FC = () => {
 
     try {
       const result = await pyodide.runPythonAsync(code);
+      
+      console.log("Result:", result);	
       setConsoleOutput(result);
     } catch (error) {
       setConsoleOutput(`Error: ${error}`);
@@ -106,7 +151,7 @@ const CodeSection: React.FC = () => {
   return (
     <div className="h-screen flex flex-col">
       <div className="w-full bg-blue-600 py-3 text-white text-lg font-bold text-center relative">
-        Python Code Editor
+         Code Editor
         <div className="absolute right-4 top-2 text-white font-bold text-lg">
           🕒 Time {formatTime(timeLeft)}
         </div>
@@ -117,7 +162,7 @@ const CodeSection: React.FC = () => {
       <div className="flex flex-1">
         <div className="w-1/3 p-4 bg-gray-100 overflow-auto">
           <p className="text-lg font-bold">Questions</p>
-          <p>Questions here!</p>
+          {/* <div>{formatString(assignedQuestion || "Loading....")}</div> */}
         </div>
 
         <div className="w-2/3 p-4 bg-white border-l flex flex-col">
