@@ -10,7 +10,7 @@ import { dracula } from "@uiw/codemirror-theme-dracula";
 import { loadPyodide } from "pyodide";
 import axios from "axios";
 import { baseUrl, GetToken } from "../App";
-// import { formatString } from "../components/FormatString"; 
+import { formatString } from "../components/FormatString"; 
 
 
 const CodeSection: React.FC = () => {
@@ -21,12 +21,12 @@ const CodeSection: React.FC = () => {
   const [theme, setTheme] = useState(oneDark);
   const [language, setLanguage] = useState(python());
   const [pyodide, setPyodide] = useState<any>(null);
-  // interface Question {
-  //   Questions: string[];
-  // }
-  // const [questions, setQuestions] = useState<Question[]>([]);
-  // const [assignedQuestion, setAssignedQuestion] = useState<string>("");
-  // const [studentId, setStudentId] = useState<string>("");
+  interface Question {
+    Questions: string[];
+  }
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [assignedQuestion, setAssignedQuestion] = useState<string>("");
+  const [studentId, setStudentId] = useState<string>("");
   const themeMap: Record<string, any> = {
     "one-dark": oneDark,
     "material": material,
@@ -67,7 +67,7 @@ const CodeSection: React.FC = () => {
           headers: { Authorization: `Bearer ${idToken}` },
         });
   
-        // setQuestions(questionResponse.data);
+        setQuestions(questionResponse.data);
         console.log("Questions:", questionResponse.data);
       } catch (error) {
         console.error("Error fetching questions:", error);
@@ -77,8 +77,8 @@ const CodeSection: React.FC = () => {
     const fetchStudentId = () => {
       const userData = localStorage.getItem("userData");
       if (userData) {
-        // const parsedData = JSON.parse(userData); 
-        // setStudentId(parsedData.StudentId);
+        const parsedData = JSON.parse(userData); 
+        setStudentId(parsedData.StudentId);
       }
     };
   
@@ -86,26 +86,26 @@ const CodeSection: React.FC = () => {
     fetchStudentId();
   }, []);
   
-  // useEffect(() => {
-  //   if (questions.length > 0 && studentId) {
-  //     const numericPart = studentId.replace(/\D/g, ""); 
-  //     const studentIndex = parseInt(numericPart, 10) % questions.length; 
-  //     const studentQuestions = questions[studentIndex]?.Questions || [];
+  useEffect(() => {
+    if (questions.length > 0 && studentId) {
+      const numericPart = studentId.replace(/\D/g, ""); 
+      const studentIndex = parseInt(numericPart, 10) % questions.length; 
+      const studentQuestions = questions[studentIndex]?.Questions || [];
   
-  //       let randomIndex: number | null = null;
+        let randomIndex: number | null = null;
 
-  //     if (studentQuestions.length > 0) {
-  //       randomIndex = Math.floor(Math.random() * studentQuestions.length);
-  //       setAssignedQuestion(studentQuestions[randomIndex]);
-  //     } else {
-  //       setAssignedQuestion("No question available for this student.");
-  //     }
+      if (studentQuestions.length > 0) {
+        randomIndex = Math.floor(Math.random() * studentQuestions.length);
+        setAssignedQuestion(studentQuestions[randomIndex]);
+      } else {
+        setAssignedQuestion("No question available for this student.");
+      }
   
-  //     console.log("Extracted Number:", numericPart);
-  //     console.log("Student Index:", studentIndex);
-  //     console.log("Assigned Question Index:", randomIndex);
-  //   }
-  // }, [questions, studentId]);
+      console.log("Extracted Number:", numericPart);
+      console.log("Student Index:", studentIndex);
+      console.log("Assigned Question Index:", randomIndex);
+    }
+  }, [questions, studentId]);
   
   
   
@@ -162,7 +162,7 @@ const CodeSection: React.FC = () => {
       <div className="flex flex-1">
         <div className="w-1/3 p-4 bg-gray-100 overflow-auto">
           <p className="text-lg font-bold">Questions</p>
-          {/* <div>{formatString(assignedQuestion || "Loading....")}</div> */}
+          <div>{formatString(assignedQuestion || "Loading....")}</div>
         </div>
 
         <div className="w-2/3 p-4 bg-white border-l flex flex-col">

@@ -106,7 +106,7 @@ useEffect(() => {
           const userCredential = await signInWithEmailAndPassword(auth, values.username, values.password);
           console.log("Admin signed in:", userCredential.user);
           localStorage.setItem("userData", JSON.stringify(matchedAdmin))
-          navigate("/AdminDash"); //correct this
+          navigate("/AdminDashboard"); //correct this
         } catch (authError) {
           console.error("Sign-in failed:", authError);
           setError("Invalid email or password.");
