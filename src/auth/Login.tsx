@@ -38,7 +38,7 @@ export interface Admin {
   Role: string;
 }
 
-const StudentLogin: React.FC = () => {
+const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [showSignUp, setShowSignUp] = useState(false);
@@ -89,7 +89,7 @@ useEffect(() => {
       const isAdmin = values.username.includes("@");
     
       if (isAdmin) {
-        console.log("Checking for admin account...");
+        // console.log("Checking for admin account...");
     
         if (!adminData || adminData.length === 0) {
           setError("Admin data is missing. Try again later.");
@@ -137,6 +137,9 @@ useEffect(() => {
       <div className="w-full bg-blue-400 py-4 text-center text-white text-xl font-bold">
         CBT
       </div>
+      <div className="relative w-full flex justify-center my-4">
+    <img src="/oau.png" alt="logo" className="w-32 opacity-70" />
+  </div>
 
       {showSignUp ? (
   <div>
@@ -193,7 +196,7 @@ useEffect(() => {
                   type={showPassword ? "text" : "password"}
                   name="password"
                   className="w-full pl-10 pr-10 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  placeholder="e.g., surname"
+                  placeholder="e.g., username"
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
                   value={formik.values.password}
@@ -227,5 +230,5 @@ useEffect(() => {
     </div>
   );
 };
+export default Login;
 
-export default StudentLogin;

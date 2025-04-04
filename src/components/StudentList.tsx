@@ -27,7 +27,7 @@ const StudentList: React.FC = () => {
         });
         setStudents(response.data);
       } catch (error) {
-        console.error("Error fetching students:", error);
+        // console.error("Error fetching students:", error);
       }
     };
     fetchStudents();
@@ -77,7 +77,7 @@ const StudentList: React.FC = () => {
       setEditingStudentId(null);
       setEditFormData({});
     } catch (error) {
-      console.error("Error updating student:", error);
+      // console.error("Error updating student:", error);
     }
   };
   
@@ -93,7 +93,7 @@ const StudentList: React.FC = () => {
   
       setStudents((prev) => prev.filter((student) => student.StudentId !== studentId));
     } catch (error) {
-      console.error("Error deleting student:", error);
+      // console.error("Error deleting student:", error);
     }
   };
   

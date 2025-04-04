@@ -60,6 +60,9 @@ const AdminDashboard: React.FC = () => {
           <button onClick={() => setActiveTab("students")} className="block w-full text-left p-2 hover:bg-blue-600 rounded">
             Students
           </button>
+          <button onClick={() => setActiveTab("Students Score")} className="block w-full text-left p-2 hover:bg-blue-600 rounded">
+            Students Scores
+          </button>
           <a href="/adminupload" className="block p-2 hover:bg-blue-600 rounded">Upload</a>
           <button onClick={handleLogout} className="block w-full text-left p-2 bg-blue-300 hover:bg-blue-600 rounded mt-10">
             Logout

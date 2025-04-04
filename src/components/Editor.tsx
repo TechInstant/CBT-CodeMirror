@@ -41,7 +41,12 @@ const CodeSection: React.FC = () => {
     const loadPython = async () => {
       try {
         const pyInstance = await loadPyodide();
-        pyInstance.setStdout({batched: handleOutput})
+        pyInstance.setStdout({
+          batched: (text: string) => setConsoleOutput((prev) => prev + "\n" + text),
+        });
+        pyInstance.setStderr({
+          batched: (output: string) => setConsoleOutput((prev) => prev + "\nError: " + output),
+        });
         setPyodide(pyInstance);
       } catch (error) {
         console.error("Failed to load Pyodide:", error);
@@ -49,6 +54,7 @@ const CodeSection: React.FC = () => {
     };
     loadPython();
   }, []);
+
  
   useEffect(() => {
     if (timeLeft <= 0) {
@@ -88,27 +94,28 @@ const CodeSection: React.FC = () => {
   
   useEffect(() => {
     if (questions.length > 0 && studentId) {
-      const numericPart = studentId.replace(/\D/g, ""); 
-      const studentIndex = parseInt(numericPart, 10) % questions.length; 
-      const studentQuestions = questions[studentIndex]?.Questions || [];
-  
-        let randomIndex: number | null = null;
-
-      if (studentQuestions.length > 0) {
-        randomIndex = Math.floor(Math.random() * studentQuestions.length);
-        setAssignedQuestion(studentQuestions[randomIndex]);
+      const storedQuestion = localStorage.getItem("assignedQuestion");
+      if (storedQuestion) {
+        setAssignedQuestion(storedQuestion);
       } else {
-        setAssignedQuestion("No question available for this student.");
-      }
+        const numericPart = studentId.replace(/\D/g, "");
+        const studentIndex = parseInt(numericPart, 10) % questions.length;
+        const studentQuestions = questions[studentIndex]?.Questions || [];
+
+        if (studentQuestions.length > 0) {
+          const randomIndex = Math.floor(Math.random() * studentQuestions.length);
+          const newAssignedQuestion = studentQuestions[randomIndex];
+          setAssignedQuestion(newAssignedQuestion);
+          localStorage.setItem("assignedQuestion", newAssignedQuestion);
+        } else {
+          setAssignedQuestion("No question available for this student.");
+        }
   
-      console.log("Extracted Number:", numericPart);
-      console.log("Student Index:", studentIndex);
-      console.log("Assigned Question Index:", randomIndex);
+        console.log("Extracted Number:", numericPart);
+        console.log("Student Index:", studentIndex);
+      }
     }
   }, [questions, studentId]);
-  
-  
-  
 
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -118,36 +125,31 @@ const CodeSection: React.FC = () => {
 
  
 
-  const handleOutput = (output: string) => {
-    console.log(output);
-  }
   const handleRunCode = async () => {
     setConsoleOpen(true);
     if (!pyodide) {
       setConsoleOutput("Python runtime is still loading...");
       return;
     }
-
     try {
       const result = await pyodide.runPythonAsync(code);
-      
-      console.log("Result:", result);	
-      setConsoleOutput(result);
+      setConsoleOutput((prev) => prev + "\n" + result);
     } catch (error) {
-      setConsoleOutput(`Error: ${error}`);
+      setConsoleOutput((prev) => prev + `\nError: ${error}`);
     }
   };
 
   const handleSubmit = () => {
-    toast.success("Code submitted successfully!", {
-      position: "top-right",
-      autoClose: 3000,
-    });
-    setTimeout(() => {
-      window.location.href = "/";
-    }, 3500);
+    toast.success("Code submitted successfully!", { position: "top-right", autoClose: 3000 });
+    localStorage.removeItem("assignedQuestion");
+    localStorage.removeItem("userData");
+    setTimeout(() => { window.location.href = "/"; }, 3500);
+  };
+  const handleClearConsole = () => {
+    setConsoleOutput("");
   };
 
+  
   return (
     <div className="h-screen flex flex-col">
       <div className="w-full bg-blue-600 py-3 text-white text-lg font-bold text-center relative">
@@ -202,31 +204,26 @@ const CodeSection: React.FC = () => {
           </div>
 
           {consoleOpen && (
-            <div className="w-full bg-black text-white h-40 mt-2 overflow-auto">
-              <p className="text-lg font-bold mb-2">Console Output:</p>
-              <div className="bg-gray-900 p-3 rounded-md overflow-auto h-28">
-                <pre className="whitespace-pre-wrap break-words">{consoleOutput}</pre>
+            <div className="mt-4">
+              <div className="w-full bg-black text-white h-40 overflow-auto flex justify-between">
+                <div className="flex-1 p-2">
+                  <p className="text-lg font-bold mb-2">Console Output:</p>
+                  <pre>{consoleOutput}</pre>
+                </div>
+              <div className="">
+                <button onClick={handleClearConsole} className="px-2 py-1  text-white rounded-md hover:bg-gray-500">Clear</button>
+                <button onClick={() => setConsoleOpen(!consoleOpen)} className="px-2 py-1  text-white rounded-md hover:bg-gray-500">Hide</button>
+              </div>
               </div>
             </div>
-          )}
-        </div>
+          )}        </div>
       </div>
-
       <div className="flex justify-end space-x-4 p-4">
-        <button
-          onClick={handleRunCode}
-          className="px-4 py-2 bg-gray-400 text-white rounded-md hover:bg-gray-500"
-        >
-          Run Code
-        </button>
-        <button
-          onClick={handleSubmit}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-        >
-          Submit
-        </button>
+        <button onClick={handleRunCode} className="px-4 py-2 bg-gray-400 text-white rounded-md hover:bg-gray-500">Run Code</button>
+        <button onClick={handleSubmit} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Submit</button>  
       </div>
     </div>
+
   );
 };
 

@@ -88,7 +88,7 @@ const AdminUpload: React.FC = () => {
           });
           // await new Promise((resolve) => setTimeout(resolve, 200));
         } catch (error) {
-          console.error(`Error uploading ${student.StudentId}:`, error);
+          // console.error(`Error uploading ${student.StudentId}:`, error);
         }
       }
       const questions = {
