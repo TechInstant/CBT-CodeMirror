@@ -6,14 +6,14 @@ import { User } from "../auth/Login";
 const WelcomePage: React.FC = () => {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [user, setUser] = useState<User>();
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
-  const [user, setUser] = useState<User>()
-
+  
   useEffect(() => {
     const data: User = JSON.parse(localStorage.getItem('userData')!);
-    setUser(data)
+    setUser(data);
   }, []);
   
   const handleLogout = () => {
@@ -39,15 +39,19 @@ const WelcomePage: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center text-center z-0">
-      <div className="w-2/3 bg-white p-6 rounded-lg shadow-lg">
+        <div className="w-2/3 bg-white p-6 rounded-lg shadow-lg">
           <p className="text-center text-2xl font-bold mb-4">Welcome</p>
-          <p className="text-lg font-semibold">Name: {user?.FirstName ? `${user.FirstName} ${user.LastName}` : "Student"}</p>
-          <p className="text-lg font-semibold">Department: {user?.Department ? user.Department : "Not Available"}</p>
+          <p className="text-lg font-semibold">
+            Name: {user?.FirstName ? `${user.FirstName} ${user.LastName}` : "Student"}
+          </p>
+          <p className="text-lg font-semibold">
+            Department: {user?.Department ? user.Department : "Not Available"}
+          </p>
           <button 
-            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 p-2 mt-4"
+            className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 mt-4"
             onClick={() => navigate("/codesection")} 
           >
-            Start Practicing
+            Start Coding
           </button>
         </div>
       </div>

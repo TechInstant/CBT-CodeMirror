@@ -19,9 +19,9 @@ const AdminDashboard: React.FC = () => {
   const [studentCount, setStudentCount] = useState<number>(0);
 
   useEffect(() => {
-    const Admin = localStorage.getItem("userData");
-    if (Admin) {
-      setAdmin(JSON.parse(Admin));
+    const AdminData = localStorage.getItem("userData");
+    if (AdminData) {
+      setAdmin(JSON.parse(AdminData));
     }
   }, []);
 
@@ -51,20 +51,40 @@ const AdminDashboard: React.FC = () => {
       <aside className="w-64 bg-blue-700 text-white p-4">
         <h1 className="text-2xl font-bold mb-4">CSCM CodeMirror</h1>
         <nav className="space-y-2">
-          <button onClick={() => setActiveTab("dashboard")} className="block w-full text-left p-2 hover:bg-blue-600 rounded">
+          <button
+            onClick={() => setActiveTab("dashboard")}
+            className="block w-full text-left p-2 hover:bg-blue-600 rounded transition-colors duration-200"
+          >
             Dashboard
           </button>
-          <button onClick={() => setActiveTab("questions")} className="block w-full text-left p-2 hover:bg-blue-600 rounded">
+          <button
+            onClick={() => setActiveTab("questions")}
+            className="block w-full text-left p-2 hover:bg-blue-600 rounded transition-colors duration-200"
+          >
             Questions
           </button>
-          <button onClick={() => setActiveTab("students")} className="block w-full text-left p-2 hover:bg-blue-600 rounded">
+          <button
+            onClick={() => setActiveTab("students")}
+            className="block w-full text-left p-2 hover:bg-blue-600 rounded transition-colors duration-200"
+          >
             Students
           </button>
-          <button onClick={() => setActiveTab("Students Score")} className="block w-full text-left p-2 hover:bg-blue-600 rounded">
+          <button
+            onClick={() => setActiveTab("Students Score")}
+            className="block w-full text-left p-2 hover:bg-blue-600 rounded transition-colors duration-200"
+          >
             Students Scores
           </button>
-          <a href="/adminupload" className="block p-2 hover:bg-blue-600 rounded">Upload</a>
-          <button onClick={handleLogout} className="block w-full text-left p-2 bg-blue-300 hover:bg-blue-600 rounded mt-10">
+          <a
+            href="/adminupload"
+            className="block p-2 hover:bg-blue-600 rounded transition-colors duration-200"
+          >
+            Upload
+          </a>
+          <button
+            onClick={handleLogout}
+            className="block w-full text-left p-2 hover:bg-blue-600 rounded mt-10 transition-colors duration-200"
+          >
             Logout
           </button>
         </nav>

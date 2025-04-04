@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaUpload } from "react-icons/fa";
+import { FaUpload, FaArrowLeft } from "react-icons/fa";
+import { CiSquareQuestion } from "react-icons/ci";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Papa from "papaparse";
@@ -14,7 +15,10 @@ const AdminUpload: React.FC = () => {
   const [studentsData, setStudentsData] = useState<any[]>([]);
   const [questionsData, setQuestionsData] = useState<any[]>([]);
   const [courseTitle, setCourseTitle] = useState("");
-  const [timer, setTimer] = useState(""); 
+  const [timer, setTimer] = useState("");
+
+  const [maxQuestions, setMaxQuestions] = useState<number>(0);
+  const [showMaxInfo, setShowMaxInfo] = useState<boolean>(false);
 
   const navigate = useNavigate();
 
@@ -47,16 +51,12 @@ const AdminUpload: React.FC = () => {
                   };
                 });
                 setStudentsData(formattedStudents);
-                console.log(formattedStudents)
-                // toast.success("Students file successfully uploaded");
               } else {
-                let questionsArray:any = []
-                results.data.map((question: any) => {
-                  // questionText: question.QUESTIONS || "",
-                  questionsArray.push(question.QUESTIONS)
+                let questionsArray: any = [];
+                results.data.forEach((question: any) => {
+                  questionsArray.push(question.QUESTIONS);
                 });
                 setQuestionsData(questionsArray);
-                // toast.success("Questions file processed successfully!");
               }
             },
           });
@@ -67,9 +67,15 @@ const AdminUpload: React.FC = () => {
   };
 
   const handleNext = () => {
-    if (step === 1 && !studentsFile) return toast.error("Please upload the students CSV file!");
-    if (step === 2 && !questionsFile) return toast.error("Please upload the questions CSV file!");
-    if (step === 3 && !courseTitle) return toast.error("Please enter a course title!");
+    if (step === 1 && !studentsFile) {
+      return toast.error("Please upload the students CSV file!");
+    }
+    if (step === 2 && !questionsFile) {
+      return toast.error("Please upload the questions CSV file!");
+    }
+    if (step === 3 && !courseTitle) {
+      return toast.error("Please enter a course title!");
+    }
     setStep(step + 1);
   };
 
@@ -81,44 +87,60 @@ const AdminUpload: React.FC = () => {
     }
     try {
       const idToken = await GetToken();
+
+      // Upload Students
       for (const student of studentsData) {
         try {
           await axios.post(`${baseUrl}/students`, student, {
             headers: { Authorization: `Bearer ${idToken}` },
           });
-          // await new Promise((resolve) => setTimeout(resolve, 200));
         } catch (error) {
-          // console.error(`Error uploading ${student.StudentId}:`, error);
         }
       }
+
+      
       const questions = {
         CourseTitle: courseTitle,
         Duration: Number(timer),
+        MaxQuestions: maxQuestions, 
         Questions: questionsData,
         CourseCode: "",
       };
-      // console.log("Sending Questions Payload:", JSON.stringify(questions, null, 1));
+
+      // Upload Questions
       await axios.post(`${baseUrl}/questions`, questions, {
-        headers: { 
+        headers: {
           Authorization: `Bearer ${idToken}`,
           "Content-Type": "application/json",
-        },       
-      });     
+        },
+      });
+
       toast.success("Data uploaded successfully!");
       navigate("/AdminDashboard");
     } catch (error) {
-      console.error(`Error uploading ${questionsData}:`, error);
+      console.error("Error uploading data:", error);
       toast.error("Error uploading data.");
     }
   };
 
   return (
     <div className="max-h-screen flex flex-col items-center justify-center bg-white">
+      <div className="absolute top-4 left-4">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
+        >
+          <FaArrowLeft />
+          <span>Back</span>
+        </button>
+      </div>
+
       <div className="w-full bg-blue-600 py-4 text-center text-white text-xl font-bold">
         Admin Upload
       </div>
 
       <div className="w-full max-w-md p-8 bg-blue-50 rounded-lg shadow-md mt-10">
+        {/* Step 1: Students Upload */}
         {step === 1 && (
           <>
             <p className="mb-2 text-sm font-semibold">Step 1: Upload Students CSV</p>
@@ -128,7 +150,13 @@ const AdminUpload: React.FC = () => {
             >
               Upload Students CSV <FaUpload className="ml-2" />
             </button>
-            <input type="file" id="studentsFile" accept=".csv" className="hidden" onChange={(e) => handleFileChange(e, "students")} />
+            <input
+              type="file"
+              id="studentsFile"
+              accept=".csv"
+              className="hidden"
+              onChange={(e) => handleFileChange(e, "students")}
+            />
             {studentsFile && <p className="text-sm text-gray-700">{studentsFile.name}</p>}
             {studentsData.length > 0 && (
               <div className="mt-4 overflow-x-auto">
@@ -156,6 +184,7 @@ const AdminUpload: React.FC = () => {
           </>
         )}
 
+        {/* Step 2: Questions Upload */}
         {step === 2 && (
           <>
             <p className="mb-2 text-sm font-semibold">Step 2: Upload Questions File</p>
@@ -165,7 +194,13 @@ const AdminUpload: React.FC = () => {
             >
               Upload Questions CSV File <FaUpload className="ml-2" />
             </button>
-            <input type="file" id="questionsFile" accept=".csv" className="hidden" onChange={(e) => handleFileChange(e, "questions")} />
+            <input
+              type="file"
+              id="questionsFile"
+              accept=".csv"
+              className="hidden"
+              onChange={(e) => handleFileChange(e, "questions")}
+            />
             {questionsFile && <p className="text-sm text-gray-700">{questionsFile.name}</p>}
             {questionsData.length > 0 && (
               <div className="mt-4 overflow-x-auto">
@@ -173,7 +208,7 @@ const AdminUpload: React.FC = () => {
                 <table className="w-full border border-gray-300 text-sm">
                   <thead>
                     <tr className="bg-gray-200">
-                      {Object.keys(questionsData[0]).map((key) => (
+                      {Object.keys(questionsData[0] ?? {}).map((key) => (
                         <th key={key} className="border p-2">{key}</th>
                       ))}
                     </tr>
@@ -193,19 +228,89 @@ const AdminUpload: React.FC = () => {
           </>
         )}
 
+        {/* Step 3: Course Details and Maximum Questions */}
         {step === 3 && (
           <>
             <p className="mb-2 text-sm font-semibold">Step 3: Enter Course Details</p>
             <label className="block text-sm font-medium text-gray-700">Course Title</label>
-            <input type="text" className="w-full border rounded-md p-2 mt-2" placeholder="Enter course title" value={courseTitle} onChange={(e) => setCourseTitle(e.target.value)} />
-            <label className="block text-sm font-medium text-gray-700 mt-4">Set Duration {`(in minutes)`}</label>
-            <input type="number" className="w-full border rounded-md p-2 mt-2" value={timer} onChange={(e) => setTimer(e.target.value)}/>
+            <input
+              type="text"
+              className="w-full border rounded-md p-2 mt-2"
+              placeholder="Enter course title"
+              value={courseTitle}
+              onChange={(e) => setCourseTitle(e.target.value)}
+            />
+            <label className="block text-sm font-medium text-gray-700 mt-4">
+              Set Duration (in minutes)
+            </label>
+            <input
+              type="number"
+              className="w-full border rounded-md p-2 mt-2"
+              value={timer}
+              onChange={(e) => setTimer(e.target.value)}
+            />
+
+            {/* Maximum Questions Field */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700">
+                Maximum Questions to Answer maxA<sup><CiSquareQuestion 
+                  className="inline text-blue-600 cursor-pointer"
+                  onMouseEnter={() => setShowMaxInfo(true)}
+                  onMouseLeave={() => setShowMaxInfo(false)}
+                /></sup>{" "}
+                
+              </label>
+              {showMaxInfo && (
+                <div className="mt-1 p-1 border rounded bg-white shadow text-xs">
+                  <p>
+                    Max Answerable Questions.
+                    Enter a number manually or click <span className="text-green-600">MAX</span> to use the total.
+                  </p>
+                </div>
+              )}
+              <div className="flex items-center space-x-2 mt-2">
+                <input
+                  type="number"
+                  className="w-24 border rounded-md p-2"
+                  value={maxQuestions}
+                  onChange={(e) => setMaxQuestions(parseInt(e.target.value, 10) || 0)}
+                />
+                <span
+                  onClick={() => setMaxQuestions(questionsData.length)}
+                  className="text-green-600 cursor-pointer"
+                >
+                  MAX
+                </span>
+              </div>
+            </div>
           </>
         )}
 
+        {/* Navigation Buttons */}
         <div className="flex justify-between mt-6">
-          {step > 1 && <button onClick={handlePrevious} className="px-4 py-2 bg-gray-400 text-white rounded-md">Previous</button>}
-          {step < 3 ? <button onClick={handleNext} className="px-4 py-2 bg-blue-600 text-white rounded-md">Next</button> : <button onClick={handleSubmit} className="px-4 py-2 bg-green-600 text-white rounded-md">Submit</button>}
+          {step > 1 && (
+            <button
+              onClick={handlePrevious}
+              className="px-4 py-2 bg-gray-400 text-white rounded-md"
+            >
+              Previous
+            </button>
+          )}
+          {step < 3 ? (
+            <button
+              onClick={handleNext}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md"
+            >
+              Next
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmit}
+              className="px-4 py-2 bg-green-600 text-white rounded-md"
+            >
+              Submit
+            </button>
+          )}
         </div>
       </div>
       <ToastContainer />
