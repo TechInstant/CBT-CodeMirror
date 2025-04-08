@@ -1,37 +1,19 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useContext} from "react";
 import axios from "axios";
 import { CSVLink } from "react-csv";
 import { baseUrl, GetToken } from "../App";
-
-interface Student {
-  StudentId: string;
-  FirstName: string;
-  LastName: string;
-  Department: string;
-  Email: string;
-  Scores: number;
-}
+import { StudentsContext, Student } from "../Context/StudentContext"; // adjust the path as needed
 
 const StudentList: React.FC = () => {
-  const [students, setStudents] = useState<Student[]>([]);
+  const context = useContext(StudentsContext);
+  if (!context) {
+    throw new Error("StudentList must be used within a StudentsProvider");
+  }
+  const { students, setStudents } = context;
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Student>>({});
-
-  useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        const idToken = await GetToken();
-        const response = await axios.get<Student[]>(`${baseUrl}/students`, {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        setStudents(response.data);
-      } catch (error) {
-        // console.error("Error fetching students:", error);
-      }
-    };
-    fetchStudents();
-  }, []);
 
   const filteredStudents = students.filter((student) =>
     student.FirstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -58,45 +40,43 @@ const StudentList: React.FC = () => {
   const handleSaveEdit = async (studentId: string) => {
     try {
       const idToken = await GetToken();
-      const StudentId = studentId.replace(/\//g, "_"); 
-  
-      const updatedData = { ...editFormData, StudentId: StudentId };
-  
-      console.log("Sending Data:", updatedData); 
-  
-      await axios.patch(`${baseUrl}/students/${StudentId}`, updatedData, {
+      // Replace "/" if needed in studentId
+      const updatedStudentId = studentId.replace(/\//g, "_"); 
+      
+      const updatedData = { ...editFormData, StudentId: updatedStudentId };
+
+      await axios.patch(`${baseUrl}/students/${updatedStudentId}`, updatedData, {
         headers: { Authorization: `Bearer ${idToken}` },
       });
-  
+
+      // Update the context state
       setStudents((prev) =>
         prev.map((student) =>
           student.StudentId === studentId ? { ...student, ...editFormData } : student
         )
       );
-  
+      
       setEditingStudentId(null);
       setEditFormData({});
     } catch (error) {
-      // console.error("Error updating student:", error);
+      console.error("Error updating student:", error);
     }
   };
-  
 
   const handleDelete = async (studentId: string) => {
     try {
       const idToken = await GetToken();
-      const StudentId = studentId.replace(/\//g, "_"); 
-  
-      await axios.delete(`${baseUrl}/students/${StudentId}`, {
+      const updatedStudentId = studentId.replace(/\//g, "_"); 
+      
+      await axios.delete(`${baseUrl}/students/${updatedStudentId}`, {
         headers: { Authorization: `Bearer ${idToken}` },
       });
-  
+      
       setStudents((prev) => prev.filter((student) => student.StudentId !== studentId));
     } catch (error) {
-      // console.error("Error deleting student:", error);
+      console.error("Error deleting student:", error);
     }
   };
-  
 
   return (
     <div>
@@ -165,8 +145,12 @@ const StudentList: React.FC = () => {
                     </td>
                     <td className="border p-2">{student.Scores}</td>
                     <td className="border p-2 space-x-2">
-                      <button onClick={() => handleSaveEdit(student.StudentId)} className="text-green-600 hover:underline">Save</button>
-                      <button onClick={handleCancelEdit} className="text-gray-600 hover:underline">Cancel</button>
+                      <button onClick={() => handleSaveEdit(student.StudentId)} className="text-green-600 hover:underline">
+                        Save
+                      </button>
+                      <button onClick={handleCancelEdit} className="text-gray-600 hover:underline">
+                        Cancel
+                      </button>
                     </td>
                   </>
                 ) : (
@@ -177,9 +161,13 @@ const StudentList: React.FC = () => {
                     <td className="border p-2">{student.Department}</td>
                     <td className="border p-2">{student.Email}</td>
                     <td className="border p-2">{student.Scores}</td>
-                    <td className="border p-2 space-x-2" >
-                      <button onClick={() => handleEditClick(student)} className="text-white bg-green-600 cursor-pointer">Edit</button>
-                      <button onClick={() => handleDelete(student.StudentId)} className="text-white text- bg-red-600 w-1/2 cursor-pointer">Delete</button>
+                    <td className="border p-2 space-x-2">
+                      <button onClick={() => handleEditClick(student)} className="text-white bg-green-600 cursor-pointer">
+                        Edit
+                      </button>
+                      <button onClick={() => handleDelete(student.StudentId)} className="text-white bg-red-600 w-1/2 cursor-pointer">
+                        Delete
+                      </button>
                     </td>
                   </>
                 )}
@@ -187,7 +175,13 @@ const StudentList: React.FC = () => {
             ))}
           </tbody>
         </table>
-        <CSVLink data={students} filename="students_results.csv" className="bg-green-500 text-white p-2 rounded mt-4 inline-block">Download Results</CSVLink>
+        <CSVLink
+          data={students}
+          filename="students_results.csv"
+          className="bg-green-500 text-white p-2 rounded mt-4 inline-block"
+        >
+          Download Results
+        </CSVLink>
       </div>
     </div>
   );

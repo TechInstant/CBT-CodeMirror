@@ -5,18 +5,20 @@ import CodeSection from './components/Editor';
 import AdminUpload from './components/AdminUpload';
 import AdminDashboard from './components/AdminDashboard';
 import axios from 'axios';
-import { AuthProvider } from './Context/AuthContext';
+// import { AuthProvider } from './Context/AuthContext';
 import ProtectedRoute from "./components/ProtectedRoute";
+import { StudentsProvider } from './Context/StudentContext';
+import { QuestionsProvider } from './Context/QuestionContext';
 
 function App() {
   return (
     
     <Router>
       <div>
-      <AuthProvider>
+      <StudentsProvider>
+        <QuestionsProvider>
         <Routes>
-        <Route path="/" element={<Login />} />
-        
+        <Route path="/" element={<Login />} />   
           <Route element={<ProtectedRoute />}>
           <Route path="/AdminDashboard" element={<AdminDashboard />} />
           <Route path="/" element={<Login />} />  
@@ -25,7 +27,8 @@ function App() {
           <Route path="/adminUpload" element={<AdminUpload />} />
           </Route>
         </Routes>
-        </AuthProvider>
+        </QuestionsProvider>
+        </StudentsProvider>
       </div>
     </Router>
   );

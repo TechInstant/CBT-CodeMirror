@@ -1,14 +1,8 @@
-import React, { useState, useEffect, ChangeEvent } from "react";
+// QuestionsList.tsx
+import React, { ChangeEvent, useState } from "react";
 import axios from "axios";
 import { baseUrl, GetToken } from "../App";
-
-interface Question {
-  QuestionId: string;
-  CourseTitle: string;
-  CourseCode?: string;
-  Questions: { [key: string]: string };
-  Duration: number;
-}
+import { useQuestions, Question } from "../Context/QuestionContext"; 
 
 interface ModalProps {
   message: string;
@@ -41,39 +35,21 @@ const ConfirmationModal: React.FC<ModalProps> = ({ message, onConfirm, onCancel 
 };
 
 const QuestionsList: React.FC = () => {
-  const [questions, setQuestions] = useState<Question[]>([]);
+  // Instead of our own questions state, use the context.
+  const { questions, loading, updateQuestionInContext, deleteQuestionFromContext } = useQuestions();
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedQuestion, setEditedQuestion] = useState<Question | null>(null);
   const [showDocumentDeleteModal, setShowDocumentDeleteModal] = useState(false);
   const [targetDocument, setTargetDocument] = useState<Question | null>(null);
-
   const [showLineDeleteModal, setShowLineDeleteModal] = useState(false);
   const [targetQuestionLineKey, setTargetQuestionLineKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchQuestions = async () => {
-      try {
-        const idToken = await GetToken();
-        const response = await axios.get<Question[]>(`${baseUrl}/questions`, {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        setQuestions(response.data);
-      } catch (error) {
-        console.log("Error fetching questions:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchQuestions();
-  }, []);
 
   const filteredQuestions = questions.filter((q) =>
     q.CourseTitle.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
 
   const handleQuestionClick = (question: Question) => {
     setSelectedQuestion(question);
@@ -101,17 +77,15 @@ const QuestionsList: React.FC = () => {
     if (!targetDocument) return;
     try {
       const idToken = await GetToken();
-      await axios.delete(`${baseUrl}/questions/${targetDocument.QuestionId}`, {
+      await axios.delete(`${baseUrl}/questions/${targetDocument.questionId}`, {
         headers: { Authorization: `Bearer ${idToken}` },
       });
-      setQuestions((prev) =>
-        prev.filter((q) => q.QuestionId !== targetDocument.QuestionId)
-      );
-      if (selectedQuestion?.QuestionId === targetDocument.QuestionId) {
+      deleteQuestionFromContext(targetDocument.questionId);
+      if (selectedQuestion?.questionId === targetDocument.questionId) {
         setSelectedQuestion(null);
       }
     } catch (error) {
-      console.log("Error deleting question:", error);
+      console.error("Error deleting question:", error);
     } finally {
       setShowDocumentDeleteModal(false);
       setTargetDocument(null);
@@ -145,7 +119,6 @@ const QuestionsList: React.FC = () => {
     setTargetQuestionLineKey(null);
   };
 
-  // Update input fields for editing (CourseTitle, CourseCode, Duration)
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (!editedQuestion) return;
     const { name, value } = e.target;
@@ -155,7 +128,6 @@ const QuestionsList: React.FC = () => {
     });
   };
 
-  // Update a specific question field in the Questions object
   const handleQuestionFieldChange = (key: string, value: string) => {
     if (!editedQuestion) return;
     setEditedQuestion({
@@ -167,7 +139,6 @@ const QuestionsList: React.FC = () => {
     });
   };
 
-  // Add a new question line to the Questions object
   const handleAddQuestionField = () => {
     if (!editedQuestion) return;
     const newKey = `Question${Object.keys(editedQuestion.Questions).length + 1}`;
@@ -181,24 +152,19 @@ const QuestionsList: React.FC = () => {
     });
   };
 
-  // Save edited question to the backend
   const handleSave = async () => {
     if (!editedQuestion) return;
     try {
       const idToken = await GetToken();
       const response = await axios.patch(
-        `${baseUrl}/questions/${editedQuestion.QuestionId}`,
+        `${baseUrl}/questions/${editedQuestion.questionId}`,
         editedQuestion,
         {
           headers: { Authorization: `Bearer ${idToken}` },
         }
       );
-      // Update the questions state with the edited question
-      setQuestions((prev) =>
-        prev.map((q) =>
-          q.QuestionId === editedQuestion.QuestionId ? response.data.data : q
-        )
-      );
+      // Update the question in the context.
+      updateQuestionInContext(response.data.data);
       setSelectedQuestion(response.data.data);
       setIsEditing(false);
       setEditedQuestion(null);
@@ -242,7 +208,7 @@ const QuestionsList: React.FC = () => {
               <ul className="space-y-2">
                 {filteredQuestions.map((q) => (
                   <li
-                    key={q.QuestionId}
+                    key={q.questionId}
                     className="border p-2 rounded-md bg-gray-50 cursor-pointer hover:bg-gray-100"
                     onClick={() => handleQuestionClick(q)}
                   >
@@ -255,7 +221,6 @@ const QuestionsList: React.FC = () => {
           )}
         </>
       ) : (
-    
         <div className="bg-white p-4 shadow-md rounded relative">
           <button
             onClick={handleBackToList}
@@ -276,7 +241,10 @@ const QuestionsList: React.FC = () => {
                 <ul className="list-disc pl-5">
                   {Object.entries(selectedQuestion.Questions).map(([key, value]) => (
                     <li key={key}>
-                      <strong>{key}:</strong> {value}
+                      <strong>{key}:</strong>{" "}
+                      {typeof value === "object" && value !== null
+                        ? value.questionText
+                        : value}
                     </li>
                   ))}
                 </ul>
@@ -339,7 +307,7 @@ const QuestionsList: React.FC = () => {
                         <label className="block text-sm font-semibold">{key}:</label>
                         <input
                           type="text"
-                          value={value}
+                          value={typeof value === "object" && value !== null ? value.questionText : value}
                           onChange={(e) => handleQuestionFieldChange(key, e.target.value)}
                           className="px-2 py-1 border rounded-md w-full"
                         />
@@ -363,10 +331,7 @@ const QuestionsList: React.FC = () => {
                   </button>
                 </div>
                 <div className="mt-4 space-x-2">
-                  <button
-                    onClick={handleSave}
-                    className="text-green-600 hover:underline"
-                  >
+                  <button onClick={handleSave} className="text-green-600 hover:underline">
                     Save
                   </button>
                   <button

@@ -54,8 +54,11 @@ const AdminUpload: React.FC = () => {
               } else {
                 let questionsArray: any = [];
                 results.data.forEach((question: any) => {
-                  questionsArray.push(question.QUESTIONS);
-                });
+                  questionsArray.push({
+                    questionId: question["Question ID"],
+                    questionText: question.Question,
+                  });
+                });                               
                 setQuestionsData(questionsArray);
               }
             },
@@ -203,28 +206,27 @@ const AdminUpload: React.FC = () => {
             />
             {questionsFile && <p className="text-sm text-gray-700">{questionsFile.name}</p>}
             {questionsData.length > 0 && (
-              <div className="mt-4 overflow-x-auto">
-                <p className="text-sm font-semibold">Preview:</p>
-                <table className="w-full border border-gray-300 text-sm">
-                  <thead>
-                    <tr className="bg-gray-200">
-                      {Object.keys(questionsData[0] ?? {}).map((key) => (
-                        <th key={key} className="border p-2">{key}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {questionsData.slice(0, 1).map((row, index) => (
-                      <tr key={index} className="border">
-                        {Object.values(row).map((value, idx) => (
-                          <td key={idx} className="border p-2">{value as string}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+  <div className="mt-4 overflow-x-auto">
+    <p className="text-sm font-semibold">Preview:</p>
+    <table className="w-full border border-gray-300 text-sm">
+      <thead>
+        <tr className="bg-gray-200">
+          <th className="border p-2">Question ID</th>
+          <th className="border p-2">Question</th>
+        </tr>
+      </thead>
+      <tbody>
+        {questionsData.slice(0, 1).map((q, idx) => (
+          <tr key={idx}>
+            <td className="border p-2">{q.questionId}</td>
+            <td className="border p-2">{q.questionText}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
+
           </>
         )}
 
@@ -253,21 +255,27 @@ const AdminUpload: React.FC = () => {
             {/* Maximum Questions Field */}
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700">
-                Maximum Questions to Answer maxA<sup><CiSquareQuestion 
-                  className="inline text-blue-600 cursor-pointer"
-                  onMouseEnter={() => setShowMaxInfo(true)}
-                  onMouseLeave={() => setShowMaxInfo(false)}
-                /></sup>{" "}
-                
+                Max Answerable Questions: maxA
+                <sup>
+                  <div className="relative inline-block">
+                    <CiSquareQuestion 
+                      className="inline text-blue-600 cursor-pointer text-2xl" 
+                      onClick={() => setShowMaxInfo(!showMaxInfo)} 
+                    />
+                    {showMaxInfo && (
+                      <div 
+                        className="absolute z-10 top-[-5px] left-[40px] p-2 border rounded bg-white shadow text-xs"
+                        onClick={() => setShowMaxInfo(false)}
+                      >
+                        <p>
+                        This is the number of questions that should be made available to each student to answer. Choose<span className="text-green-600">"Max"</span>
+                        to use the total number of questions uploaded.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </sup>
               </label>
-              {showMaxInfo && (
-                <div className="mt-1 p-1 border rounded bg-white shadow text-xs">
-                  <p>
-                    Max Answerable Questions.
-                    Enter a number manually or click <span className="text-green-600">MAX</span> to use the total.
-                  </p>
-                </div>
-              )}
               <div className="flex items-center space-x-2 mt-2">
                 <input
                   type="number"
