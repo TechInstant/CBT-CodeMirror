@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import axios from "axios";
 import { baseUrl, GetToken } from "../App";
 
-// Define the Question interface (adjust as needed)
+
 export interface Question {
   questionId: string;
   CourseTitle: string;
@@ -12,7 +12,7 @@ export interface Question {
   Duration: number;
 }
 
-// Define the type for our Context's value.
+
 interface QuestionsContextType {
   questions: Question[];
   loading: boolean;
@@ -21,15 +21,12 @@ interface QuestionsContextType {
   deleteQuestionFromContext: (questionId: string) => void;
 }
 
-// Create the Context with default value as null
-const QuestionsContext = createContext<QuestionsContextType | null>(null);
-
+export const QuestionsContext = createContext<QuestionsContextType | null>(null);
 
 export const QuestionsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Function to fetch the questions from your backend
   const fetchQuestions = async () => {
     try {
       const idToken = await GetToken();
@@ -44,12 +41,11 @@ export const QuestionsProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   };
 
-  // Call fetchQuestions once when the provider is mounted
   useEffect(() => {
     fetchQuestions();
   }, []);
 
-  // Function to force a refresh of the questions
+
   const refreshQuestions = async () => {
     setLoading(true);
     await fetchQuestions();

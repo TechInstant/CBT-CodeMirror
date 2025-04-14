@@ -1,4 +1,3 @@
-// QuestionsList.tsx
 import React, { ChangeEvent, useState } from "react";
 import axios from "axios";
 import { baseUrl, GetToken } from "../App";
@@ -35,9 +34,7 @@ const ConfirmationModal: React.FC<ModalProps> = ({ message, onConfirm, onCancel 
 };
 
 const QuestionsList: React.FC = () => {
-  // Instead of our own questions state, use the context.
   const { questions, loading, updateQuestionInContext, deleteQuestionFromContext } = useQuestions();
-
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -226,7 +223,7 @@ const QuestionsList: React.FC = () => {
             onClick={handleBackToList}
             className="text-blue-600 hover:underline mb-4 flex items-center space-x-1"
           >
-            <span aria-hidden="true">⬅️🔙</span>
+            <span aria-hidden="true">⬅️</span>
             <span>Back to List</span>
           </button>
           {!isEditing ? (

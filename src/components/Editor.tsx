@@ -158,7 +158,8 @@ const CodeSection: React.FC = () => {
               </div>
               </div>
             </div>
-          )}        </div>
+          )}        
+          </div>
       </div>
       <div className="flex justify-end space-x-4 p-4">
         <button onClick={handleRunCode} className="px-4 py-2 bg-gray-400 text-white rounded-md hover:bg-gray-500">Run Code</button>
