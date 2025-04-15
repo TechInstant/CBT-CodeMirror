@@ -8,26 +8,34 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import { material } from "@uiw/codemirror-theme-material";
 import { dracula } from "@uiw/codemirror-theme-dracula";
 import { loadPyodide } from "pyodide";
-import axios from "axios";
-import { baseUrl, GetToken } from "../App";
-import { formatString } from "../components/FormatString"; 
+// import { formatString } from "../components/FormatString"; 
+import { useQuestions } from "../Context/QuestionContext";
+import { FaSpinner } from "react-icons/fa";
 
+const formatTime = (seconds: number) => {
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${minutes.toString().padStart(2, "0")}:${secs
+    .toString()
+    .padStart(2, "0")}`;
+};
 
 
 const CodeSection: React.FC = () => {
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [consoleOutput, setConsoleOutput] = useState<string>("");
   const [code, setCode] = useState<string>("print('Hello, World!')");
-  const [timeLeft, setTimeLeft] = useState(3600);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [timerStarted, setTimerStarted] = useState(false);
   const [theme, setTheme] = useState(oneDark);
   const [language, setLanguage] = useState(python());
   const [pyodide, setPyodide] = useState<any>(null);
-
-  const [question, setQuestion] = useState<{question: string}>();
-
   const themeMap = { "one-dark": oneDark, material, dracula };
   const languageMap = { python: python(), javascript: javascript() };
   const isFetched = useRef(false);
+  // const { studentQuestions, fetchAndAssignRandomQuestions } = useQuestions();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const { questions, studentQuestions, fetchAndAssignRandomQuestions } = useQuestions();
 
   useEffect(() => {
     const loadPython = async () => {
@@ -48,60 +56,50 @@ const CodeSection: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (timeLeft <= 0) {
-      handleSubmit();
+    if (!timerStarted && questions.length > 0) {
+      const examDuration = questions[0].Duration; // Duration for the whole test
+      if (examDuration) {
+        setTimeLeft(examDuration);
+        setTimerStarted(true);
+      }
+    }
+  }, [questions, timerStarted]);
+
+  // Countdown timer effect.
+  useEffect(() => {
+    if (timeLeft === null || timeLeft <= 0) {
+      if (timeLeft === 0) handleSubmit();
       return;
     }
-    const timer = setInterval(() => setTimeLeft((prevTime) => prevTime - 1), 1000);
+    const timer = setInterval(() => setTimeLeft((prev) => (prev ?? 0) - 1), 1000);
     return () => clearInterval(timer);
   }, [timeLeft]);
 
+
   useEffect(() => {
-    if (isFetched.current) return; 
-    let isMounted = true;
-    if (!isMounted) return; 
-    
-    const fetchRandomQuestion = async () => {
-      try {
-        const storedQuestion = localStorage.getItem("assignedQuestion");
-        console.log("Stored Question:", storedQuestion);
-        if (storedQuestion){
-          setQuestion(JSON.parse(storedQuestion))
-        } else {
-          const idToken = await GetToken();
-          const response = await axios.get(
-            `${baseUrl}/questions/random/Introduction to Python Programming Language_CSC202`,
-            {
-              headers: { Authorization: `Bearer ${idToken}` },
-            }
-          );
-          console.log("Response:", response.data);
-          // set to localstorage
-          localStorage.setItem("assignedQuestion", JSON.stringify(response.data));
-          if (isMounted) {
-            setQuestion(response.data);
-          }
-        }
+    if (isFetched.current) return;
+    // let activeQuestionId = localStorage.getItem("activeQuestionId");
 
-        isFetched.current = true; 
-      } catch (error) {
-        console.log("Error fetching questions:", error);
-      }
+    const activeQuestionId = localStorage.getItem("activeQuestionId");
+    if (activeQuestionId) {
+      fetchAndAssignRandomQuestions(activeQuestionId);
+    } else {
+      console.error("Active question document ID not found in localStorage.");
     }
-    fetchRandomQuestion();
+    isFetched.current = true;
+  }, [fetchAndAssignRandomQuestions]);
 
-    return () => {
-      isMounted = false; 
-    }
-  }, []);
-  
   
 
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
+  useEffect(() => {
+    if (timeLeft === null || timeLeft <= 0) {
+      if (timeLeft === 0) handleSubmit(); 
+      return;
+    }
+    const timer = setInterval(() => setTimeLeft((prev) => (prev ?? 0) - 1), 1000);
+    return () => clearInterval(timer);
+  }, [timeLeft]);
+  
 
   const handleRunCode = async () => {
     setConsoleOpen(true);
@@ -131,14 +129,47 @@ const CodeSection: React.FC = () => {
     <div className="h-screen flex flex-col">
       <div className="w-full bg-blue-600 py-3 text-white text-lg font-bold text-center relative">
         Code Editor
-        <div className="absolute right-4 top-2 text-white font-bold text-lg">🕒 Time {formatTime(timeLeft)}</div>
+        <div className="absolute right-4 top-2 text-white font-bold text-lg">🕒 Time Left: {timeLeft !== null ? formatTime(timeLeft) : <FaSpinner className="animate-spin text-2xl" />}</div>
       </div>
       <ToastContainer />
       <div className="flex flex-1">
         <div className="w-1/3 p-4 bg-gray-100 overflow-auto">
-          <p className="text-lg font-bold">Question</p>
-          <div>{formatString(question?.question || "Loading...")}</div>
+        <p className="text-lg font-bold">Question {currentIndex + 1}</p>
+        <div>
+        {studentQuestions[currentIndex] ? (
+    typeof studentQuestions[currentIndex] === "object" &&
+    studentQuestions[currentIndex] !== null &&
+    "questionText" in studentQuestions[currentIndex] ? (
+      (studentQuestions[currentIndex] as { questionText: string }).questionText
+    ) : (
+      studentQuestions[currentIndex]
+    )
+  ) : (
+    <div className="flex items-center justify-center">
+      <FaSpinner className="animate-spin text-3xl text-blue-600" />
+    </div>
+  )}
         </div>
+        {studentQuestions.length > 1 && (
+          <div className="mt-4 flex justify-between">
+            <button
+              disabled={currentIndex === 0}
+              onClick={() => setCurrentIndex((prev) => prev - 1)}
+              className="bg-gray-300 px-3 py-1 rounded disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              disabled={currentIndex >= studentQuestions.length - 1}
+              onClick={() => setCurrentIndex((prev) => prev + 1)}
+              className="bg-gray-300 px-3 py-1 rounded disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
+      
         <div className="w-2/3 p-4 bg-white border-l flex flex-col">
           <div className="mb-4 flex space-x-4">
             <select onChange={(e) => setTheme(themeMap[e.target.value as keyof typeof themeMap])}>{Object.keys(themeMap).map((theme) => (<option key={theme} value={theme}>{theme}</option>))}</select>

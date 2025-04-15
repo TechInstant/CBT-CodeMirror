@@ -2,6 +2,7 @@ import React, { ChangeEvent, useState } from "react";
 import axios from "axios";
 import { baseUrl, GetToken } from "../App";
 import { useQuestions, Question } from "../Context/QuestionContext"; 
+import { FaSpinner } from "react-icons/fa";
 
 interface ModalProps {
   message: string;
@@ -43,6 +44,7 @@ const QuestionsList: React.FC = () => {
   const [targetDocument, setTargetDocument] = useState<Question | null>(null);
   const [showLineDeleteModal, setShowLineDeleteModal] = useState(false);
   const [targetQuestionLineKey, setTargetQuestionLineKey] = useState<string | null>(null);
+  const [activationMessage, setActivationMessage] = useState("");
 
   const filteredQuestions = questions.filter((q) =>
     q.CourseTitle.toLowerCase().includes(searchTerm.toLowerCase())
@@ -64,6 +66,29 @@ const QuestionsList: React.FC = () => {
     setIsEditing(true);
     setEditedQuestion({ ...question });
   };
+
+  const handleActivateCourse = async (question: Question) => {
+    try {
+      const idToken = await GetToken();
+      const currentActiveId = localStorage.getItem("activeQuestionId");
+      if (currentActiveId === question.questionId) {
+        localStorage.removeItem("activeQuestionId");
+        setActivationMessage(`Course "${question.CourseTitle}" deactivated.`);
+        return;
+      }
+      await axios.patch(
+        `${baseUrl}/questions/activate/${question.questionId}`,
+        {},
+        { headers: { Authorization: `Bearer ${idToken}` } }
+      );
+      localStorage.setItem("activeQuestionId", question.questionId);
+      setActivationMessage(`Course "${question.CourseTitle}" activated.`);
+    } catch (error) {
+      console.log("Error activating course:", error);
+      setActivationMessage("Failed to activate the course.");
+    }
+  };
+  
 
   const initiateDeleteDocument = (question: Question) => {
     setTargetDocument(question);
@@ -160,7 +185,7 @@ const QuestionsList: React.FC = () => {
           headers: { Authorization: `Bearer ${idToken}` },
         }
       );
-      // Update the question in the context.
+
       updateQuestionInContext(response.data.data);
       setSelectedQuestion(response.data.data);
       setIsEditing(false);
@@ -197,22 +222,43 @@ const QuestionsList: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="px-3 py-2 border rounded-md w-full"
             />
+
           </div>
+          {activationMessage && <p className="mb-4 text-green-600">{activationMessage}</p>}
           {loading ? (
-            <p>Loading questions...</p>
+            <div className="flex items-center justify-center">
+                  <FaSpinner className="animate-spin text-3xl text-blue-600" />
+                </div>
           ) : (
             <div className="bg-white p-4 shadow-md rounded overflow-auto">
               <ul className="space-y-2">
-                {filteredQuestions.map((q) => (
-                  <li
-                    key={q.questionId}
-                    className="border p-2 rounded-md bg-gray-50 cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleQuestionClick(q)}
-                  >
-                    <p className="font-bold">{q.CourseTitle}</p>
-                    {q.CourseCode && <p>{q.CourseCode}</p>}
-                  </li>
-                ))}
+              {filteredQuestions.map((q) => {
+                    const isActive = localStorage.getItem("activeQuestionId") === q.questionId;
+                    return (
+                      <li
+                        key={q.questionId}
+                        className={`flex justify-between items-center border p-2 rounded-md ${
+                          isActive ? "bg-green-100" : "bg-gray-50"
+                        } hover:bg-gray-100`}
+                      >
+                        <div
+                          className="cursor-pointer"
+                          onClick={() => handleQuestionClick(q)}
+                        >
+                          <p className="font-bold">{q.CourseTitle}</p>
+                          {q.CourseCode && <p>{q.CourseCode}</p>}
+                        </div>
+                        <button
+                          onClick={() => handleActivateCourse(q)}
+                          className={`ml-4 px-4 py-2 ${
+                            isActive ? "bg-gray-500" : "bg-blue-600"
+                          } text-white rounded hover:bg-red-700 shrink-0`}
+                        >
+                          {isActive ? "Deactivate" : "Activate"}
+                        </button>
+                      </li>
+                    );
+                  })}
               </ul>
             </div>
           )}

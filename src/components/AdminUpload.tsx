@@ -17,7 +17,7 @@ const AdminUpload: React.FC = () => {
   const [courseTitle, setCourseTitle] = useState("");
   const [timer, setTimer] = useState("");
 
-  const [maxQuestions, setMaxQuestions] = useState<number>(0);
+  const [MaxAnswerable, setMaxAnswerable] = useState<number>(0);
   const [showMaxInfo, setShowMaxInfo] = useState<boolean>(false);
 
   const navigate = useNavigate();
@@ -105,7 +105,7 @@ const AdminUpload: React.FC = () => {
       const questions = {
         CourseTitle: courseTitle,
         Duration: Number(timer),
-        MaxQuestions: maxQuestions, 
+        MaxAnswerable: MaxAnswerable, 
         Questions: questionsData,
         CourseCode: "",
       };
@@ -280,11 +280,11 @@ const AdminUpload: React.FC = () => {
                 <input
                   type="number"
                   className="w-24 border rounded-md p-2"
-                  value={maxQuestions}
-                  onChange={(e) => setMaxQuestions(parseInt(e.target.value, 10) || 0)}
+                  value={MaxAnswerable}
+                  onChange={(e) => setMaxAnswerable(parseInt(e.target.value, 10) || 0)}
                 />
                 <span
-                  onClick={() => setMaxQuestions(questionsData.length)}
+                  onClick={() => setMaxAnswerable(questionsData.length)}
                   className="text-green-600 cursor-pointer"
                 >
                   MAX
