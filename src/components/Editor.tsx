@@ -41,12 +41,29 @@ const CodeSection: React.FC = () => {
     const loadPython = async () => {
       try {
         const pyInstance = await loadPyodide();
+  
+        // Redirect stdout and stderr
         pyInstance.setStdout({
           batched: (text: string) => setConsoleOutput((prev) => prev + "\n" + text),
         });
         pyInstance.setStderr({
           batched: (output: string) => setConsoleOutput((prev) => prev + "\nError: " + output),
         });
+  
+        // Override `input()` to use browser prompt
+        pyInstance.runPython(`
+          import builtins
+          from js import prompt
+
+          def browser_input(prompt_text=""):
+              response = prompt(str(prompt_text))  # Convert to string in case it's not
+              if response is None:
+                  raise EOFError("No input provided.")
+              return response
+
+          builtins.input = browser_input
+        `);
+  
         setPyodide(pyInstance);
       } catch (error) {
         console.error("Failed to load Pyodide:", error);
@@ -57,9 +74,9 @@ const CodeSection: React.FC = () => {
 
   useEffect(() => {
     if (!timerStarted && questions.length > 0) {
-      const examDuration = questions[0].Duration; // Duration for the whole test
-      if (examDuration) {
-        setTimeLeft(examDuration);
+      const examDurationInMinutes = questions[0].Duration; 
+      if (examDurationInMinutes) {
+        setTimeLeft(examDurationInMinutes * 60);
         setTimerStarted(true);
       }
     }
@@ -124,6 +141,53 @@ const CodeSection: React.FC = () => {
   const handleClearConsole = () => {
     setConsoleOutput("");
   };
+
+  useEffect(() => {
+  const handleVisibilityChange = () => {
+    if (document.hidden) {
+      toast.error("You left the page. Test auto-submitted.", { autoClose: 2000 });
+      handleSubmit(); // Auto-submit and redirect
+    }
+  };
+
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+
+  return () => {
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+  };
+}, []);
+
+
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => e.preventDefault();
+    const handleCopyCutPaste = (e: ClipboardEvent) => e.preventDefault();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        ["c", "x", "v", "u", "s", "a"].includes(e.key.toLowerCase())
+      ) {
+        e.preventDefault();
+      }
+      if (e.key === "PrintScreen") {
+        navigator.clipboard.writeText("Screenshots are disabled.");
+      }
+    };
+  
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("copy", handleCopyCutPaste);
+    document.addEventListener("cut", handleCopyCutPaste);
+    document.addEventListener("paste", handleCopyCutPaste);
+    document.addEventListener("keydown", handleKeyDown);
+  
+    return () => {
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("copy", handleCopyCutPaste);
+      document.removeEventListener("cut", handleCopyCutPaste);
+      document.removeEventListener("paste", handleCopyCutPaste);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+  
 
   return (
     <div className="h-screen flex flex-col">

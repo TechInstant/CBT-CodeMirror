@@ -2,8 +2,7 @@ import React, { useState, useContext} from "react";
 import axios from "axios";
 import { CSVLink } from "react-csv";
 import { baseUrl, GetToken } from "../App";
-import { StudentsContext, Student } from "../Context/StudentContext"; // adjust the path as needed
-
+import { StudentsContext, Student } from "../Context/StudentContext"; 
 const StudentList: React.FC = () => {
   const context = useContext(StudentsContext);
   if (!context) {
@@ -40,7 +39,6 @@ const StudentList: React.FC = () => {
   const handleSaveEdit = async (studentId: string) => {
     try {
       const idToken = await GetToken();
-      // Replace "/" if needed in studentId
       const updatedStudentId = studentId.replace(/\//g, "_"); 
       
       const updatedData = { ...editFormData, StudentId: updatedStudentId };

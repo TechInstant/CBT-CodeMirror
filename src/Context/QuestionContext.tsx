@@ -33,8 +33,15 @@ export const QuestionsProvider: React.FC<{ children: ReactNode }> = ({ children 
 
 
   const fetchQuestions = async () => {
+    // check local storage for questions
+    const idToken = await GetToken();
+    const storedQuestions = localStorage.getItem("assignedQuestions");
+    // fetch questions from API
     try {
-      const idToken = await GetToken();
+      if (storedQuestions) {
+        const parsedQuestions = JSON.parse(storedQuestions);
+        setQuestions(parsedQuestions);
+      }
       const response = await axios.get<Question[]>(`${baseUrl}/questions`, {
         headers: { Authorization: `Bearer ${idToken}` },
       });

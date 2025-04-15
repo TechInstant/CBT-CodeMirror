@@ -76,6 +76,16 @@ const WelcomePage: React.FC = () => {
         </div>
       </div>
       {isModalOpen && <LogoutModal onClose={closeModal} onConfirm={handleLogout} />}
+      {/* Warning Box */}
+<div className="absolute bottom-4 right-4 bg-red-100 text-red-800 border border-red-300 p-4 rounded-lg shadow-md text-sm max-w-xs z-10">
+  <p className="font-semibold mb-1">⚠️ Monitoring Notice</p>
+  <ul className="list-disc list-inside space-y-1 text-left">
+    <li>This exam is being monitored.</li>
+    <li>Your camera is on.</li>
+    <li>Changing tabs will auto-submit and log you out.</li>
+  </ul>
+</div>
+
     </div>
   );
 };

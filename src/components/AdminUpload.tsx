@@ -86,20 +86,32 @@ const AdminUpload: React.FC = () => {
 
   const handleSubmit = async () => {
     if (studentsData.length === 0 || questionsData.length === 0) {
-      return toast.error("Please upload and process both students and questions files!");
-    }
-    try {
-      const idToken = await GetToken();
+    return toast.error("Please upload and process both students and questions files!");
+  }
+  try {
+    const idToken = await GetToken();
 
-      // Upload Students
-      for (const student of studentsData) {
-        try {
-          await axios.post(`${baseUrl}/students`, student, {
-            headers: { Authorization: `Bearer ${idToken}` },
-          });
-        } catch (error) {
-        }
+    // Step 1. Fetch already existing students from the database.
+    const existingResponse = await axios.get(`${baseUrl}/students`, {
+      headers: { Authorization: `Bearer ${idToken}` },
+    });
+    const existingStudents = existingResponse.data; 
+    const existingStudentIds = new Set(existingStudents.map((s: any) => s.StudentId));
+
+    for (const student of studentsData) {
+      if (existingStudentIds.has(student.StudentId)) {
+        console.log(`Student with ID ${student.StudentId} already exists.`);
+        continue;
       }
+      try {
+        await axios.post(`${baseUrl}/students`, student, {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        console.log(`Student with ID ${student.StudentId} uploaded successfully.`);
+      } catch (error) {
+        console.error(`Error uploading student ${student.StudentId}:`, error);
+      }
+    }
 
       
       const questions = {
