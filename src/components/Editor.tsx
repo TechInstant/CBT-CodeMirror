@@ -8,7 +8,7 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import { material } from "@uiw/codemirror-theme-material";
 import { dracula } from "@uiw/codemirror-theme-dracula";
 import { loadPyodide } from "pyodide";
-// import { formatString } from "../components/FormatString"; 
+import { formatString } from "../components/FormatString"; 
 import { useQuestions } from "../Context/QuestionContext";
 import { FaSpinner } from "react-icons/fa";
 
@@ -32,10 +32,22 @@ const CodeSection: React.FC = () => {
   const [pyodide, setPyodide] = useState<any>(null);
   const themeMap = { "one-dark": oneDark, material, dracula };
   const languageMap = { python: python(), javascript: javascript() };
-  const isFetched = useRef(false);
+  // const isFetched = useRef(false);
   // const { studentQuestions, fetchAndAssignRandomQuestions } = useQuestions();
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // const [currentIndex, setCurrentIndex] = useState(0);
   const { questions, studentQuestions, fetchAndAssignRandomQuestions } = useQuestions();
+
+
+   // restore index from storage
+   const [currentIndex, setCurrentIndex] = useState(() => {
+    const saved = localStorage.getItem("currentQuestionIndex");
+    return saved ? +saved : 0;
+  });
+  useEffect(() => {
+    localStorage.setItem("currentQuestionIndex", String(currentIndex));
+  }, [currentIndex]);
+
+
 
   useEffect(() => {
     const loadPython = async () => {
@@ -66,56 +78,69 @@ const CodeSection: React.FC = () => {
   
         setPyodide(pyInstance);
       } catch (error) {
-        console.error("Failed to load Pyodide:", error);
+        console.log("Failed to load Pyodide:", error);
       }
     };
     loadPython();
   }, []);
 
+   const firstFetch = useRef(false);
+   useEffect(() => {
+     if (firstFetch.current) return;
+     const activeId = localStorage.getItem("activeQuestionId");
+     if (activeId) {
+       if (!localStorage.getItem("assignedQuestions")) {
+         fetchAndAssignRandomQuestions(activeId);
+       }
+       const saved = localStorage.getItem("examTimeLeft");
+       if (saved) {
+         setTimeLeft(+saved);
+       }
+     }
+     firstFetch.current = true;
+   }, [fetchAndAssignRandomQuestions]);
+ 
+   useEffect(() => {
+     if (timerStarted) return;
+     if (timeLeft == null && questions.length) {
+       const durationMins = questions.find(q => 
+         q.questionId === localStorage.getItem("activeQuestionId")
+       )?.Duration;
+       if (durationMins) {
+         const secs = durationMins * 60;
+         setTimeLeft(secs);
+         localStorage.setItem("examTimeLeft", String(secs));
+         setTimerStarted(true);
+       }
+     }
+   }, [questions, timerStarted, timeLeft]);
+ 
+   useEffect(() => {
+     if (!timerStarted || timeLeft == null) return;
+     if (timeLeft <= 0) {
+       handleSubmit();
+       return;
+     }
+     const id = setInterval(() => {
+       setTimeLeft(prev => {
+         const nxt = (prev ?? 0) - 1;
+         localStorage.setItem("examTimeLeft", String(nxt));
+         return nxt;
+       });
+     }, 1000);
+     return () => clearInterval(id);
+   }, [timerStarted, timeLeft]);
+
   useEffect(() => {
-    if (!timerStarted && questions.length > 0) {
-      const examDurationInMinutes = questions[0].Duration; 
-      if (examDurationInMinutes) {
-        setTimeLeft(examDurationInMinutes * 60);
-        setTimerStarted(true);
+    const onVis = () => {
+      if (document.hidden) {
+        toast.error("Switched tab—auto-submitting.", { autoClose: 2000 });
+        handleSubmit();
       }
-    }
-  }, [questions, timerStarted]);
-
-  // Countdown timer effect.
-  useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0) {
-      if (timeLeft === 0) handleSubmit();
-      return;
-    }
-    const timer = setInterval(() => setTimeLeft((prev) => (prev ?? 0) - 1), 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft]);
-
-
-  useEffect(() => {
-    if (isFetched.current) return;
-    // let activeQuestionId = localStorage.getItem("activeQuestionId");
-
-    const activeQuestionId = localStorage.getItem("activeQuestionId");
-    if (activeQuestionId) {
-      fetchAndAssignRandomQuestions(activeQuestionId);
-    } else {
-      console.error("Active question document ID not found in localStorage.");
-    }
-    isFetched.current = true;
-  }, [fetchAndAssignRandomQuestions]);
-
-  
-
-  useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0) {
-      if (timeLeft === 0) handleSubmit(); 
-      return;
-    }
-    const timer = setInterval(() => setTimeLeft((prev) => (prev ?? 0) - 1), 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft]);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
   
 
   const handleRunCode = async () => {
@@ -132,30 +157,28 @@ const CodeSection: React.FC = () => {
     }
   };
 
-  const handleSubmit = () => {
-    toast.success("Code submitted successfully!", { position: "top-right", autoClose: 3000 });
-    localStorage.removeItem("assignedQuestion");
-    localStorage.removeItem("userData");
-    setTimeout(() => { window.location.href = "/"; }, 3500);
-  };
+  function handleSubmit() {
+    toast.success("Exam submitted!", { autoClose: 2000 });
+    ["examTimeLeft", "assignedQuestions", "currentQuestionIndex", "userData"]
+      .forEach(k => localStorage.removeItem(k));
+    setTimeout(() => window.location.href = "/", 2500);
+  }
+
   const handleClearConsole = () => {
     setConsoleOutput("");
   };
 
-  useEffect(() => {
-  const handleVisibilityChange = () => {
-    if (document.hidden) {
-      toast.error("You left the page. Test auto-submitted.", { autoClose: 2000 });
-      handleSubmit(); // Auto-submit and redirect
-    }
-  };
-
-  document.addEventListener("visibilitychange", handleVisibilityChange);
-
-  return () => {
-    document.removeEventListener("visibilitychange", handleVisibilityChange);
-  };
-}, []);
+   // prevent tab switching
+  //  useEffect(() => {
+  //   const onVis = () => {
+  //     if (document.hidden) {
+  //       toast.error("Switched tab—submitting.", { autoClose: 2000 });
+  //       handleSubmit();
+  //     }
+  //   };
+  //   document.addEventListener("visibilitychange", onVis);
+  //   return () => document.removeEventListener("visibilitychange", onVis);
+  // }, []);
 
 
   useEffect(() => {
@@ -193,26 +216,35 @@ const CodeSection: React.FC = () => {
     <div className="h-screen flex flex-col">
       <div className="w-full bg-blue-600 py-3 text-white text-lg font-bold text-center relative">
         Code Editor
-        <div className="absolute right-4 top-2 text-white font-bold text-lg">🕒 Time Left: {timeLeft !== null ? formatTime(timeLeft) : <FaSpinner className="animate-spin text-2xl" />}</div>
+        <div
+          className={`absolute right-4 top-2 font-mono text-lg ${
+            (timeLeft ?? 0) <= 15 * 60 ? "text-red-400" : "text-white"
+          }`}
+        >
+          🕒 Time Left: {timeLeft !== null ? formatTime(timeLeft) : 
+          <FaSpinner className="animate-spin text-2xl" />}
+          </div>
       </div>
       <ToastContainer />
       <div className="flex flex-1">
         <div className="w-1/3 p-4 bg-gray-100 overflow-auto">
         <p className="text-lg font-bold">Question {currentIndex + 1}</p>
         <div>
+
         {studentQuestions[currentIndex] ? (
-    typeof studentQuestions[currentIndex] === "object" &&
-    studentQuestions[currentIndex] !== null &&
-    "questionText" in studentQuestions[currentIndex] ? (
-      (studentQuestions[currentIndex] as { questionText: string }).questionText
-    ) : (
-      studentQuestions[currentIndex]
-    )
-  ) : (
-    <div className="flex items-center justify-center">
-      <FaSpinner className="animate-spin text-3xl text-blue-600" />
-    </div>
-  )}
+          formatString(
+            typeof studentQuestions[currentIndex] === "object" &&
+            studentQuestions[currentIndex] !== null &&
+            "questionText" in studentQuestions[currentIndex]
+              ? (studentQuestions[currentIndex] as { questionText: string }).questionText
+              : studentQuestions[currentIndex] as string
+          )
+        ) : (
+  
+          <div className="flex items-center justify-center">
+            <FaSpinner className="animate-spin text-3xl text-blue-600" />
+          </div>
+        )}
         </div>
         {studentQuestions.length > 1 && (
           <div className="mt-4 flex justify-between">

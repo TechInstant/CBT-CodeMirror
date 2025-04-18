@@ -35,7 +35,7 @@ const ConfirmationModal: React.FC<ModalProps> = ({ message, onConfirm, onCancel 
 };
 
 const QuestionsList: React.FC = () => {
-  const { questions, loading, updateQuestionInContext, deleteQuestionFromContext } = useQuestions();
+  const { questions, loading, updateQuestionInContext, deleteQuestionFromContext, setStudentQuestions, fetchAndAssignRandomQuestions } = useQuestions();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -45,7 +45,7 @@ const QuestionsList: React.FC = () => {
   const [showLineDeleteModal, setShowLineDeleteModal] = useState(false);
   const [targetQuestionLineKey, setTargetQuestionLineKey] = useState<string | null>(null);
   const [activationMessage, setActivationMessage] = useState("");
-
+  
   const filteredQuestions = questions.filter((q) =>
     q.CourseTitle.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -67,27 +67,34 @@ const QuestionsList: React.FC = () => {
     setEditedQuestion({ ...question });
   };
 
-  const handleActivateCourse = async (question: Question) => {
+  const handleActivateCourse = async (q: Question) => {
     try {
       const idToken = await GetToken();
-      const currentActiveId = localStorage.getItem("activeQuestionId");
-      if (currentActiveId === question.questionId) {
-        localStorage.removeItem("activeQuestionId");
-        setActivationMessage(`Course "${question.CourseTitle}" deactivated.`);
-        return;
-      }
       await axios.patch(
-        `${baseUrl}/questions/activate/${question.questionId}`,
+        `${baseUrl}/questions/activate/${q.questionId}`,
         {},
         { headers: { Authorization: `Bearer ${idToken}` } }
       );
-      localStorage.setItem("activeQuestionId", question.questionId);
-      setActivationMessage(`Course "${question.CourseTitle}" activated.`);
-    } catch (error) {
-      console.log("Error activating course:", error);
+
+      // persist active ID
+      localStorage.setItem("activeQuestionId", q.questionId);
+      await fetchAndAssignRandomQuestions(q.questionId);
+
+      setActivationMessage(`Course "${q.CourseTitle}" activated.`);
+    } catch (err) {
+      console.log(err);
       setActivationMessage("Failed to activate the course.");
     }
   };
+
+  const handleDeactivateCourse = () => {
+    localStorage.removeItem("activeQuestionId");
+    localStorage.removeItem("assignedQuestions");
+    // you already have setStudentQuestions in context
+    setStudentQuestions([]);
+    setActivationMessage("Course deactivated.");
+  };
+  
   
 
   const initiateDeleteDocument = (question: Question) => {
@@ -106,8 +113,8 @@ const QuestionsList: React.FC = () => {
       if (selectedQuestion?.questionId === targetDocument.questionId) {
         setSelectedQuestion(null);
       }
-    } catch (error) {
-      console.error("Error deleting question:", error);
+    } catch {
+      console.log("Error deleting question:");
     } finally {
       setShowDocumentDeleteModal(false);
       setTargetDocument(null);
@@ -249,7 +256,7 @@ const QuestionsList: React.FC = () => {
                           {q.CourseCode && <p>{q.CourseCode}</p>}
                         </div>
                         <button
-                          onClick={() => handleActivateCourse(q)}
+                          onClick={() => isActive ? handleDeactivateCourse() :handleActivateCourse(q)}
                           className={`ml-4 px-4 py-2 ${
                             isActive ? "bg-gray-500" : "bg-blue-600"
                           } text-white rounded hover:bg-red-700 shrink-0`}

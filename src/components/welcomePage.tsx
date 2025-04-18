@@ -2,13 +2,13 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import LogoutModal from "../auth/LogoutModal"; 
 import { Student } from "../Context/StudentContext";
-import { useQuestions } from "../Context/QuestionContext"; 
+import { useQuestions } from "../Context/QuestionContext";
 
 const WelcomePage: React.FC = () => {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [user, setUser] = useState<Student | null>(null);
-  const { questions } = useQuestions();
+  const { questions, loading } = useQuestions();
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
   
@@ -27,7 +27,13 @@ const WelcomePage: React.FC = () => {
   };
 
   
-  const courseTitle = questions.length > 0 ? questions[0].CourseTitle : "No Course Available";
+  const activeId = localStorage.getItem("activeQuestionId");
+  const activeCourse = questions.find((q) => q.questionId === activeId);
+  const courseTitle = activeCourse
+    ? activeCourse.CourseTitle
+    : loading
+      ? "Loading…"
+      : "No Course Available";
 
   const handleStartCoding = () => {
     navigate("/codesection", { state: { courseTitle } });

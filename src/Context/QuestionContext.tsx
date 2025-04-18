@@ -1,4 +1,3 @@
-// QuestionsContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import axios from "axios";
 import { baseUrl, GetToken } from "../App";
@@ -15,9 +14,7 @@ export interface Question {
 interface QuestionsContextType {
   questions: Question[];
   loading: boolean;
-  refreshQuestions: () => Promise<void>;
   updateQuestionInContext: (updatedQuestion: Question) => void;
-
   deleteQuestionFromContext: (questionId: string) => void;
   studentQuestions: (string | { questionId: string; questionText: string })[];
   setStudentQuestions: (questions: (string | { questionId: string; questionText: string })[]) => void;
@@ -31,42 +28,57 @@ export const QuestionsProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [loading, setLoading] = useState(true);
   const [studentQuestions, setStudentQuestions] = useState<(string | { questionId: string; questionText: string })[]>([]);
 
-
+  // Fetch all docs for admin list
   const fetchQuestions = async () => {
-    // check local storage for questions
-    const idToken = await GetToken();
-    const storedQuestions = localStorage.getItem("assignedQuestions");
-    // fetch questions from API
     try {
-      if (storedQuestions) {
-        const parsedQuestions = JSON.parse(storedQuestions);
-        setQuestions(parsedQuestions);
-      }
-      const response = await axios.get<Question[]>(`${baseUrl}/questions`, {
+      const idToken = await GetToken();
+      const resp = await axios.get<Question[]>(`${baseUrl}/questions`, {
         headers: { Authorization: `Bearer ${idToken}` },
       });
-      setQuestions(response.data);
-    } catch (error) {
-      console.error("Error fetching questions:", error);
+      setQuestions(resp.data);
+    } catch (e) {
+      console.error("Error fetching questions:", e);
     } finally {
       setLoading(false);
     }
   };
 
+  
+  
+  // Randomized selection of student questions
+  const fetchAndAssignRandomQuestions = async (activeQuestionId: string) => {
+    try {
+      const idToken = await GetToken();
+      const resp = await axios.get<{ data: string[] }>(
+        `${baseUrl}/questions/randomized/${activeQuestionId}`,
+        { headers: { Authorization: `Bearer ${idToken}` } }
+      );
+      const randomized = resp.data.data;
+      localStorage.setItem("assignedQuestions", JSON.stringify(randomized));
+      setStudentQuestions(randomized);
+    } catch  {
+      console.log("Error fetching randomized questions:");
+    }
+  };
   useEffect(() => {
     fetchQuestions();
+  
+    const activeId = localStorage.getItem("activeQuestionId");
+    const stored = localStorage.getItem("assignedQuestions");
+  
+    if (activeId) {
+      if (stored) {
+        setStudentQuestions(JSON.parse(stored));
+      } else {
+        fetchAndAssignRandomQuestions(activeId);
+      }
+    }
   }, []);
-
-  const refreshQuestions = async () => {
-    setLoading(true);
-    await fetchQuestions();
-  };
-
+  
+  
   const updateQuestionInContext = (updatedQuestion: Question) => {
     setQuestions((prev) =>
-      prev.map((q) =>
-        q.questionId === updatedQuestion.questionId ? updatedQuestion : q
-      )
+      prev.map((q) => (q.questionId === updatedQuestion.questionId ? updatedQuestion : q))
     );
   };
 
@@ -74,26 +86,9 @@ export const QuestionsProvider: React.FC<{ children: ReactNode }> = ({ children 
     setQuestions((prev) => prev.filter((q) => q.questionId !== questionId));
   };
 
-
-  const fetchAndAssignRandomQuestions = async (activeQuestionId: string) => {
-    try {
-      const idToken = await GetToken();
-      const response = await axios.get(
-        `${baseUrl}/questions/randomized/${activeQuestionId}`,
-        { headers: { Authorization: `Bearer ${idToken}` } }
-      );
-      const randomizedQuestions: string[] = response.data.data;
-      localStorage.setItem("assignedQuestions", JSON.stringify(randomizedQuestions));
-      setStudentQuestions(randomizedQuestions);
-    } catch (err) {
-      console.error("Error fetching randomized questions:", err);
-    }
-  };
-
   const value: QuestionsContextType = {
     questions,
     loading,
-    refreshQuestions,
     updateQuestionInContext,
     deleteQuestionFromContext,
     studentQuestions,
