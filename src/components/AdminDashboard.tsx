@@ -4,6 +4,7 @@ import axios from "axios";
 import { baseUrl, GetToken } from "../App";
 import StudentList from "../components/StudentList";
 import QuestionsList from "../components/QuestionsList";
+import StudentScores from "../components/StudentScores";
 
 interface Admin {
   FirstName: string;
@@ -70,7 +71,7 @@ const AdminDashboard: React.FC = () => {
             Students
           </button>
           <button
-            onClick={() => setActiveTab("Students Score")}
+            onClick={() => setActiveTab("StudentScores")}
             className="block w-full text-left p-2 hover:bg-blue-600 rounded transition-colors duration-200"
           >
             Students Scores
@@ -108,6 +109,9 @@ const AdminDashboard: React.FC = () => {
 
         {activeTab === "students" && <StudentList />}
         {activeTab === "questions" && <QuestionsList />}
+        {activeTab === "StudentScores" && <StudentScores />}
+
+        
       </div>
     </div>
   );

@@ -36,7 +36,10 @@ function App() {
 
 export default App;
 
+
+  
   export const baseUrl = import.meta.env.VITE_REACT_APP_BASEURL;
+  export const grader = import.meta.env.VITE_REACT_GRADE_GRADER;
   export const GetToken = async () => {
         try {
           const response = await axios.post(

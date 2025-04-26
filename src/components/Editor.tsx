@@ -11,6 +11,9 @@ import { loadPyodide } from "pyodide";
 import { formatString } from "../components/FormatString"; 
 import { useQuestions } from "../Context/QuestionContext";
 import { FaSpinner } from "react-icons/fa";
+import { gradeWithGroqAI } from "../components/AutoGrade";
+import { saveSubmissionToFirebase } from "../saveScores";
+
 
 const formatTime = (seconds: number) => {
   const minutes = Math.floor(seconds / 60);
@@ -32,17 +35,17 @@ const CodeSection: React.FC = () => {
   const [pyodide, setPyodide] = useState<any>(null);
   const themeMap = { "one-dark": oneDark, material, dracula };
   const languageMap = { python: python(), javascript: javascript() };
-  // const isFetched = useRef(false);
-  // const { studentQuestions, fetchAndAssignRandomQuestions } = useQuestions();
-  // const [currentIndex, setCurrentIndex] = useState(0);
   const { questions, studentQuestions, fetchAndAssignRandomQuestions } = useQuestions();
-
-
-   // restore index from storage
    const [currentIndex, setCurrentIndex] = useState(() => {
     const saved = localStorage.getItem("currentQuestionIndex");
     return saved ? +saved : 0;
   });
+  const [questionCodeMap, setQuestionCodeMap] = useState<{ [questionId: string]: string }>({});
+  const [questionOutputMap, setQuestionOutputMap] = useState<{ [questionId: string]: string }>({});  
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+
+  
+
   useEffect(() => {
     localStorage.setItem("currentQuestionIndex", String(currentIndex));
   }, [currentIndex]);
@@ -60,8 +63,7 @@ const CodeSection: React.FC = () => {
         });
         pyInstance.setStderr({
           batched: (output: string) => setConsoleOutput((prev) => prev + "\nError: " + output),
-        });
-  
+        }); 
         // Override `input()` to use browser prompt
         pyInstance.runPython(`
           import builtins
@@ -131,86 +133,205 @@ const CodeSection: React.FC = () => {
      return () => clearInterval(id);
    }, [timerStarted, timeLeft]);
 
-  useEffect(() => {
-    const onVis = () => {
-      if (document.hidden) {
-        toast.error("Switched tab—auto-submitting.", { autoClose: 2000 });
-        handleSubmit();
-      }
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, []);
-  
-
-  const handleRunCode = async () => {
-    setConsoleOpen(true);
-    if (!pyodide) {
-      setConsoleOutput("Python runtime is still loading...");
-      return;
-    }
-    try {
-      const result = await pyodide.runPythonAsync(code);
-      setConsoleOutput((prev) => prev + "\n" + result);
-    } catch (error) {
-      setConsoleOutput((prev) => prev + `\nError: ${error}`);
-    }
-  };
-
-  function handleSubmit() {
-    toast.success("Exam submitted!", { autoClose: 2000 });
-    ["examTimeLeft", "assignedQuestions", "currentQuestionIndex", "userData"]
-      .forEach(k => localStorage.removeItem(k));
-    setTimeout(() => window.location.href = "/", 2500);
-  }
-
-  const handleClearConsole = () => {
-    setConsoleOutput("");
-  };
-
-   // prevent tab switching
-  //  useEffect(() => {
+  // useEffect(() => {
   //   const onVis = () => {
   //     if (document.hidden) {
-  //       toast.error("Switched tab—submitting.", { autoClose: 2000 });
+  //       toast.error("Switched tab—auto-submitting.", { autoClose: 2000 });
   //       handleSubmit();
   //     }
   //   };
   //   document.addEventListener("visibilitychange", onVis);
   //   return () => document.removeEventListener("visibilitychange", onVis);
   // }, []);
+  
+
+  const handleRunCode = async () => {
+    setConsoleOpen(true);
+  
+    if (!pyodide) {
+      setConsoleOutput(" Python runtime is still loading...");
+      return;
+    }
+  
+    try {
+      await pyodide.runPythonAsync(`
+        import sys
+        from io import StringIO
+        sys.stdout = StringIO()
+        sys.stderr = sys.stdout  # To also capture errors
+        `);
+        
+      await pyodide.runPythonAsync(code);
+  
+      const newOutput = await pyodide.runPythonAsync("sys.stdout.getvalue()");
+      
+      setConsoleOutput(newOutput || "Code ran successfully, but no output.");
+      
+      setQuestionOutputMap((prev) => ({
+        ...prev,
+        [questionId]: newOutput,
+      }));
+    } catch (error) {
+      const errOutput = `Error: ${error}`;
+      
+      setConsoleOutput(errOutput);
+      
+      setQuestionOutputMap((prev) => ({
+        ...prev,
+        [questionId]: errOutput,
+      }));
+    }
+  };
+  
+  const currentQuestion = studentQuestions[currentIndex];
+  const questionId =
+  typeof currentQuestion === "object" &&
+  currentQuestion !== null &&
+  "questionId" in currentQuestion
+    ? currentQuestion.questionId
+    : localStorage.getItem("activeQuestionId") ?? "unknown";
+
+    async function handleSubmit() {
+      try {
+        const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+        const studentId = userData.StudentId || userData.MatricNumber;
+        const studentName = `${userData.FirstName ?? ""} ${userData.LastName ?? ""}`.trim();
+  
+        const updatedCodeMap = {
+          ...questionCodeMap,
+          [questionId]: code,
+        };
+        const updatedOutputMap = {
+          ...questionOutputMap,
+          [questionId]: consoleOutput,
+        };
+        
+        setQuestionCodeMap(updatedCodeMap);
+        setQuestionOutputMap(updatedOutputMap);
+        
+  
+        await new Promise((res) => setTimeout(res, 100));
+  
+        const submissionArray = await Promise.all(
+          studentQuestions.map(async (question: any) => {
+            const qId = question.questionId;
+            const qText = question.questionText;
+            const code = updatedCodeMap[qId] ?? "";
+            const output = updatedOutputMap[qId] ?? "";
+        
+            let score = 0;
+            if (!code.trim() || output.includes("still loading")) {
+              return {
+                questionId: qId,
+                questionText: qText,
+                code,
+                output,
+                score,
+                totalScore: 100,
+              };
+            }
+        
+            try {
+              score = await gradeWithGroqAI(code, output, qText);
+            } catch (err) {
+              console.log("Grading error for question", qId, err);
+            }
+        
+            return {
+              questionId: qId,
+              questionText: qText,
+              code,
+              output,
+              score,
+              totalScore: 100,
+            };
+          })
+        );
+        
+  
+        const submissionData = {
+          studentId,
+          studentName,
+          timestamp: new Date().toISOString(),
+          responses: submissionArray,
+        };
+  
+        const success = await saveSubmissionToFirebase(submissionData);
+  
+        if (success) {
+          toast.success("All questions submitted successfully!", { autoClose: 2000 });
+          setHasSubmitted(true);
+        } else {
+          toast.error("Error saving submission.");
+        }
+  
+        ["examTimeLeft", "assignedQuestions", "currentQuestionIndex", "userData"].forEach((k) =>
+          localStorage.removeItem(k)
+        );
+  
+        setTimeout(() => (window.location.href = "/"), 2500);
+      } catch (err) {
+        console.error(err);
+        toast.error("Error during submission.");
+      }
+    }
+    
+
+  const handleClearConsole = () => {
+    setConsoleOutput("");
+  };
 
 
-  useEffect(() => {
-    const handleContextMenu = (e: MouseEvent) => e.preventDefault();
-    const handleCopyCutPaste = (e: ClipboardEvent) => e.preventDefault();
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        (e.ctrlKey || e.metaKey) &&
-        ["c", "x", "v", "u", "s", "a"].includes(e.key.toLowerCase())
-      ) {
-        e.preventDefault();
-      }
-      if (e.key === "PrintScreen") {
-        navigator.clipboard.writeText("Screenshots are disabled.");
-      }
-    };
+
+
+  // useEffect(() => {
+  //   const handleContextMenu = (e: MouseEvent) => e.preventDefault();
+  //   const handleCopyCutPaste = (e: ClipboardEvent) => e.preventDefault();
+  //   const handleKeyDown = (e: KeyboardEvent) => {
+  //     if (
+  //       (e.ctrlKey || e.metaKey) &&
+  //       ["c", "x", "v", "u", "s", "a"].includes(e.key.toLowerCase())
+  //     ) {
+  //       e.preventDefault();
+  //     }
+  //     if (e.key === "PrintScreen") {
+  //       navigator.clipboard.writeText("Screenshots are disabled.");
+  //     }
+  //   };
   
-    document.addEventListener("contextmenu", handleContextMenu);
-    document.addEventListener("copy", handleCopyCutPaste);
-    document.addEventListener("cut", handleCopyCutPaste);
-    document.addEventListener("paste", handleCopyCutPaste);
-    document.addEventListener("keydown", handleKeyDown);
+  //   document.addEventListener("contextmenu", handleContextMenu);
+  //   document.addEventListener("copy", handleCopyCutPaste);
+  //   document.addEventListener("cut", handleCopyCutPaste);
+  //   document.addEventListener("paste", handleCopyCutPaste);
+  //   document.addEventListener("keydown", handleKeyDown);
   
-    return () => {
-      document.removeEventListener("contextmenu", handleContextMenu);
-      document.removeEventListener("copy", handleCopyCutPaste);
-      document.removeEventListener("cut", handleCopyCutPaste);
-      document.removeEventListener("paste", handleCopyCutPaste);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
+  //   return () => {
+  //     document.removeEventListener("contextmenu", handleContextMenu);
+  //     document.removeEventListener("copy", handleCopyCutPaste);
+  //     document.removeEventListener("cut", handleCopyCutPaste);
+  //     document.removeEventListener("paste", handleCopyCutPaste);
+  //     document.removeEventListener("keydown", handleKeyDown);
+  //   };
+  // }, []);
   
+  const handleQuestionChange = (newIndex: number) => {
+    setQuestionCodeMap((prev) => ({
+      ...prev,
+      [questionId]: code,
+    }));
+    setQuestionOutputMap((prev) => ({
+      ...prev,
+      [questionId]: consoleOutput,
+    }));
+    const nextQuestion = studentQuestions[newIndex];
+    const nextId = typeof nextQuestion === "object" && nextQuestion !== null && "questionId" in nextQuestion
+      ? nextQuestion.questionId
+      : "unknown";
+  
+    setCode(questionCodeMap[nextId] ?? "");
+    setConsoleOutput(questionOutputMap[nextId] ?? "");
+    setCurrentIndex(newIndex);
+  };  
 
   return (
     <div className="h-screen flex flex-col">
@@ -247,23 +368,23 @@ const CodeSection: React.FC = () => {
         )}
         </div>
         {studentQuestions.length > 1 && (
-          <div className="mt-4 flex justify-between">
-            <button
-              disabled={currentIndex === 0}
-              onClick={() => setCurrentIndex((prev) => prev - 1)}
-              className="bg-gray-300 px-3 py-1 rounded disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <button
-              disabled={currentIndex >= studentQuestions.length - 1}
-              onClick={() => setCurrentIndex((prev) => prev + 1)}
-              className="bg-gray-300 px-3 py-1 rounded disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
-        )}
+            <div className="mt-4 flex justify-between">
+              <button
+                disabled={currentIndex === 0}
+                onClick={() => handleQuestionChange(currentIndex - 1)}
+                className="bg-gray-300 px-3 py-1 rounded disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <button
+                disabled={currentIndex >= studentQuestions.length - 1}
+                onClick={() => handleQuestionChange(currentIndex + 1)}
+                className="bg-gray-300 px-3 py-1 rounded disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          )}
       </div>
       
         <div className="w-2/3 p-4 bg-white border-l flex flex-col">
@@ -289,8 +410,19 @@ const CodeSection: React.FC = () => {
           </div>
       </div>
       <div className="flex justify-end space-x-4 p-4">
-        <button onClick={handleRunCode} className="px-4 py-2 bg-gray-400 text-white rounded-md hover:bg-gray-500">Run Code</button>
-        <button onClick={handleSubmit} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Submit</button>  
+        <button 
+        disabled={!pyodide}
+        onClick={handleRunCode} 
+        className="px-4 py-2 bg-gray-400 text-white rounded-md hover:bg-gray-500">
+          {pyodide ? "Run Code" : "Loading Python..."}
+          </button>
+        <button
+              onClick={handleSubmit}
+              disabled={hasSubmitted}
+              className="bg-blue-600 text-white px-4 py-2 rounded"
+            >
+              Submit
+        </button> 
       </div>
     </div>
   );
