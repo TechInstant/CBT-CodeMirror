@@ -43,6 +43,18 @@ export const QuestionsProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   };
 
+  const fetchActiveQuestionId = async (): Promise<string | null> => {
+    try {
+      const idToken = await GetToken();
+      const resp = await axios.get<{ activeQuestionId: string }>(`${baseUrl}/questions/active`, {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      return resp.data.activeQuestionId;
+    } catch (error) {
+      console.error("Error fetching active question:", error);
+      return null;
+    }
+  };
   
   
   // Randomized selection of student questions
@@ -60,19 +72,31 @@ export const QuestionsProvider: React.FC<{ children: ReactNode }> = ({ children 
       console.log("Error fetching randomized questions:");
     }
   };
+  
   useEffect(() => {
-    fetchQuestions();
+    const initialize = async () => {
+      await fetchQuestions();
   
-    const activeId = localStorage.getItem("activeQuestionId");
-    const stored = localStorage.getItem("assignedQuestions");
+      let activeId = localStorage.getItem("activeQuestionId");
+      const stored = localStorage.getItem("assignedQuestions");
   
-    if (activeId) {
-      if (stored) {
-        setStudentQuestions(JSON.parse(stored));
-      } else {
-        fetchAndAssignRandomQuestions(activeId);
+      if (!activeId) {
+        activeId = await fetchActiveQuestionId();
+        if (activeId) {
+          localStorage.setItem("activeQuestionId", activeId);
+        }
       }
-    }
+  
+      if (activeId) {
+        if (stored) {
+          setStudentQuestions(JSON.parse(stored));
+        } else {
+          await fetchAndAssignRandomQuestions(activeId);
+        }
+      }
+    };
+  
+    initialize();
   }, []);
   
   
