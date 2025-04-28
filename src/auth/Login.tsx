@@ -186,7 +186,7 @@ const Login: React.FC = () => {
                   type={showPassword ? "text" : "password"}
                   name="password"
                   className="w-full pl-10 pr-10 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  placeholder="e.g., username"
+                  placeholder=" "
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
                   value={formik.values.password}
