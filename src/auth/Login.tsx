@@ -10,6 +10,7 @@ import axios from "axios";
 import { baseUrl, GetToken } from "../App";
 import { SignUpForm } from "./adminSignup";
 import { StudentsContext } from "../Context/StudentContext";
+import { useQuestions } from "../Context/QuestionContext";
 
 const auth = getAuth(app);
 
@@ -35,6 +36,7 @@ export interface Admin {
 }
 
 const Login: React.FC = () => {
+  const { fetchAndAssignRandomQuestions, getActiveQuestion } = useQuestions();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [showSignUp, setShowSignUp] = useState(false);
@@ -115,6 +117,18 @@ const Login: React.FC = () => {
         );
         if (matchedStudent) {
           localStorage.setItem("userData", JSON.stringify(matchedStudent));
+
+          const assignActiveQuestion = async () => {
+            const activeQuestion = getActiveQuestion(); // this gets the active question from context
+            
+            if (activeQuestion) {
+              await fetchAndAssignRandomQuestions(activeQuestion.QuestionsId);
+            } else {
+              setError("No active question found for this student.");
+            }
+          };
+
+          await assignActiveQuestion(); // Ensure active question is set and questions are fetched
           navigate("/welcomePage");
         } else {
           setError("Account not found or wrong credentials.");

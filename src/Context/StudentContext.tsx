@@ -34,6 +34,15 @@ export const StudentsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
+  // useEffect(() => {
+  //   const storedUser = localStorage.getItem("userData");
+  //   if (storedUser) {
+  //     const parsed = JSON.parse(storedUser);
+  //     setCurrentStudent(parsed);
+  //   }
+  // }, []);
+  
+
   useEffect(() => {
     refreshStudents();
   }, []);

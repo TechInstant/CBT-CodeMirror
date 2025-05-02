@@ -9,8 +9,12 @@ const WelcomePage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [user, setUser] = useState<Student | null>(null);
   const { questions, loading } = useQuestions();
+  const activeId = localStorage.getItem("activeQuestionsId");
+  const activeCourseFromContext = questions.find((q) => q.isActive);
+  const activeCourse = questions.find((q) => q.QuestionsId === activeId) || activeCourseFromContext;
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
+  
   
   useEffect(() => {
     const storedData = localStorage.getItem("userData");
@@ -26,9 +30,6 @@ const WelcomePage: React.FC = () => {
     navigate("/"); 
   };
 
-  
-  const activeId = localStorage.getItem("activeQuestionId");
-  const activeCourse = questions.find((q) => q.questionId === activeId);
   const courseTitle = activeCourse
     ? activeCourse.CourseTitle
     : loading
@@ -36,7 +37,11 @@ const WelcomePage: React.FC = () => {
       : "No Course Available";
 
   const handleStartCoding = () => {
-    navigate("/codesection", { state: { courseTitle } });
+    if (activeCourse) {
+      navigate("/editor", { state: { courseTitle } });
+    } else {
+      alert("No active course available.");
+    }
   };
 
   return (
@@ -70,7 +75,6 @@ const WelcomePage: React.FC = () => {
             Department: {user?.Department || "Not Available"}
           </p>
           <div className="mt-4">
-            {/* <p className="text-lg font-medium">Course Title:</p> */}
             <p className="text-xl font-bold">{courseTitle}</p>
           </div>
           <button
@@ -82,16 +86,16 @@ const WelcomePage: React.FC = () => {
         </div>
       </div>
       {isModalOpen && <LogoutModal onClose={closeModal} onConfirm={handleLogout} />}
-      {/* Warning Box */}
-<div className="absolute bottom-4 right-4 bg-red-100 text-red-800 border border-red-300 p-4 rounded-lg shadow-md text-sm max-w-xs z-10">
-  <p className="font-semibold mb-1">⚠️ Monitoring Notice</p>
-  <ul className="list-disc list-inside space-y-1 text-left">
-    <li>This exam is being monitored.</li>
-    <li>Your camera is on.</li>
-    <li>Changing tabs will auto-submit and log you out.</li>
-  </ul>
-</div>
 
+      {/* Warning Box */}
+      <div className="absolute bottom-4 right-4 bg-red-100 text-red-800 border border-red-300 p-4 rounded-lg shadow-md text-sm max-w-xs z-10">
+        <p className="font-semibold mb-1">⚠️ Monitoring Notice</p>
+        <ul className="list-disc list-inside space-y-1 text-left">
+          <li>This exam is being monitored.</li>
+          <li>Your camera is on.</li>
+          <li>Changing tabs will auto-submit and log you out.</li>
+        </ul>
+      </div>
     </div>
   );
 };

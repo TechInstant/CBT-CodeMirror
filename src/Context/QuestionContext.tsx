@@ -2,23 +2,31 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import axios from "axios";
 import { baseUrl, GetToken } from "../App";
 
+export interface StudentQuestion {
+  QuestionsId: string;
+  questionText: string;
+}
+
 export interface Question {
-  questionId: string;
+  QuestionsId: string;
   CourseTitle: string;
   CourseCode?: string;
-  Questions: { [key: string]: string | { questionId: string; questionText: string } };
+  Questions: Record<string, string | { QuestionsId: string; questionText: string }>;
   Duration: number;
   MaxAnswerableQuestions?: number;
+  isActive?: boolean;
+  isDeleted?: boolean;
 }
 
 interface QuestionsContextType {
   questions: Question[];
   loading: boolean;
   updateQuestionInContext: (updatedQuestion: Question) => void;
-  deleteQuestionFromContext: (questionId: string) => void;
-  studentQuestions: (string | { questionId: string; questionText: string })[];
-  setStudentQuestions: (questions: (string | { questionId: string; questionText: string })[]) => void;
-  fetchAndAssignRandomQuestions: (activeQuestionId: string) => Promise<void>;
+  deleteQuestionFromContext: (QuestionsId: string) => void;
+  studentQuestions: StudentQuestion[];
+  setStudentQuestions: (questions: StudentQuestion[]) => void;
+  fetchAndAssignRandomQuestions: (activeQuestionsId: string) => Promise<void>;
+  getActiveQuestion: () => Question | undefined;
 }
 
 export const QuestionsContext = createContext<QuestionsContextType | null>(null);
@@ -26,15 +34,16 @@ export const QuestionsContext = createContext<QuestionsContextType | null>(null)
 export const QuestionsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
-  const [studentQuestions, setStudentQuestions] = useState<(string | { questionId: string; questionText: string })[]>([]);
+  const [studentQuestions, setStudentQuestions] = useState<StudentQuestion[]>([]);
 
   // Fetch all docs for admin list
   const fetchQuestions = async () => {
     try {
       const idToken = await GetToken();
-      const resp = await axios.get<Question[]>(`${baseUrl}/questions`, {
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
+      const resp = await axios.get<Question[]>(
+        `${baseUrl}/questions`,
+        { headers: { Authorization: `Bearer ${idToken}` } }
+      );
       setQuestions(resp.data);
     } catch (e) {
       console.error("Error fetching questions:", e);
@@ -43,94 +52,96 @@ export const QuestionsProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   };
 
-  const fetchActiveQuestionId = async (): Promise<string | null> => {
-    try {
-      const idToken = await GetToken();
-      const resp = await axios.get<{ activeQuestionId: string }>(`${baseUrl}/questions/active`, {
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      return resp.data.activeQuestionId;
-    } catch (error) {
-      console.error("Error fetching active question:", error);
-      return null;
-    }
-  };
-  
-  
   // Randomized selection of student questions
-  const fetchAndAssignRandomQuestions = async (activeQuestionId: string) => {
+  const fetchAndAssignRandomQuestions = async (activeQuestionsId: string) => {
     try {
+      const activeDoc = questions.find((q) => q.QuestionsId === activeQuestionsId);
+      if (!activeDoc) return;
+
       const idToken = await GetToken();
-      const resp = await axios.get<{ data: string[] }>(
-        `${baseUrl}/questions/randomized/${activeQuestionId}`,
+      const resp = await axios.get<{ data: any[] }>(
+        `${baseUrl}/questions/randomized/${activeDoc.QuestionsId}`,
         { headers: { Authorization: `Bearer ${idToken}` } }
       );
-      const randomized = resp.data.data;
-      localStorage.setItem("assignedQuestions", JSON.stringify(randomized));
-      setStudentQuestions(randomized);
-    } catch  {
-      console.log("Error fetching randomized questions:");
+
+      const raw = resp.data.data;
+
+      let qq: StudentQuestion[];
+
+      // If the API already returned StudentQuestion objects, just use them:
+      if (raw.length > 0 && typeof raw[0] === "object" && "questionText" in raw[0]) {
+        qq = raw as StudentQuestion[];
+      } else {
+        // Otherwise it's an array of IDs, so we look them up in activeDoc.Questions
+        qq = (raw as string[]).map((qid) => {
+          const entry = activeDoc.Questions[qid];
+          const text =
+            typeof entry === "object" && "questionText" in entry
+              ? entry.questionText
+              : typeof entry === "string"
+              ? entry
+              : "";
+          return { QuestionsId: qid, questionText: text };
+        });
+      }
+
+      setStudentQuestions(qq);
+      localStorage.setItem("assignedQuestions", JSON.stringify(qq));
+      localStorage.setItem("activeQuestionsId", activeQuestionsId);
+    } catch (err) {
+      console.error("Error fetching randomized questions:", err);
     }
   };
-  
+
+  useEffect(() => { fetchQuestions(); }, []);
+
   useEffect(() => {
-    const initialize = async () => {
-      await fetchQuestions();
-  
-      let activeId = localStorage.getItem("activeQuestionId");
-      const stored = localStorage.getItem("assignedQuestions");
-  
-      if (!activeId) {
-        activeId = await fetchActiveQuestionId();
-        if (activeId) {
-          localStorage.setItem("activeQuestionId", activeId);
-        }
-      }
-  
-      if (activeId) {
-        if (stored) {
-          setStudentQuestions(JSON.parse(stored));
-        } else {
-          await fetchAndAssignRandomQuestions(activeId);
-        }
-      }
-    };
-  
-    initialize();
-  }, []);
-  
-  
+    if (!questions.length) return;
+    const active = questions.find((q) => q.isActive);
+    if (!active) {
+      console.error("No active question in context!");
+      return;
+    }
+
+    const stored = localStorage.getItem("assignedQuestions");
+    if (stored) {
+      setStudentQuestions(JSON.parse(stored));
+    } else {
+      fetchAndAssignRandomQuestions(active.QuestionsId);
+    }
+  }, [questions]);
+
+  const getActiveQuestion = () => {
+    const activeId = localStorage.getItem("activeQuestionsId");
+    return questions.find(q => q.QuestionsId === activeId);
+  };
+
   const updateQuestionInContext = (updatedQuestion: Question) => {
-    setQuestions((prev) =>
-      prev.map((q) => (q.questionId === updatedQuestion.questionId ? updatedQuestion : q))
-    );
+    setQuestions(prev => prev.map(q => q.QuestionsId === updatedQuestion.QuestionsId ? updatedQuestion : q));
   };
 
-  const deleteQuestionFromContext = (questionId: string) => {
-    setQuestions((prev) => prev.filter((q) => q.questionId !== questionId));
-  };
-
-  const value: QuestionsContextType = {
-    questions,
-    loading,
-    updateQuestionInContext,
-    deleteQuestionFromContext,
-    studentQuestions,
-    setStudentQuestions,
-    fetchAndAssignRandomQuestions,
+  const deleteQuestionFromContext = (QuestionsId: string) => {
+    setQuestions(prev => prev.filter(q => q.QuestionsId !== QuestionsId));
   };
 
   return (
-    <QuestionsContext.Provider value={value}>
+    <QuestionsContext.Provider value={{
+      questions,
+      loading,
+      updateQuestionInContext,
+      deleteQuestionFromContext,
+      studentQuestions,
+      setStudentQuestions,
+      fetchAndAssignRandomQuestions,
+      getActiveQuestion,
+    }}>
       {children}
     </QuestionsContext.Provider>
   );
 };
 
 export const useQuestions = () => {
-  const context = useContext(QuestionsContext);
-  if (!context) {
-    throw new Error("useQuestions must be used within a QuestionsProvider");
-  }
-  return context;
+  const ctx = useContext(QuestionsContext);
+  if (!ctx) throw new Error("useQuestions must be used within QuestionsProvider");
+  return ctx;
 };

@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Login from './auth/Login';
 import WelcomePage from './components/welcomePage';
-import CodeSection from './components/Editor';
 import AdminUpload from './components/AdminUpload';
 import AdminDashboard from './components/AdminDashboard';
 import axios from 'axios';
@@ -9,6 +8,7 @@ import axios from 'axios';
 import ProtectedRoute from "./components/ProtectedRoute";
 import { StudentsProvider } from './Context/StudentContext';
 import { QuestionsProvider } from './Context/QuestionContext';
+import Editor from './components/Editor';
 
 function App() {
   return (
@@ -23,7 +23,7 @@ function App() {
           <Route path="/AdminDashboard" element={<AdminDashboard />} />
           <Route path="/" element={<Login />} />  
           <Route path="/welcomePage" element={<WelcomePage />} />
-          <Route path="/codesection" element={<CodeSection />} />
+          <Route path="/editor" element={<Editor />} />
           <Route path="/adminUpload" element={<AdminUpload />} />
           </Route>
         </Routes>

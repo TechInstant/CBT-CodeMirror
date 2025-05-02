@@ -71,14 +71,14 @@ const QuestionsList: React.FC = () => {
     try {
       const idToken = await GetToken();
       await axios.patch(
-        `${baseUrl}/questions/activate/${q.questionId}`,
+        `${baseUrl}/questions/activate/${q.QuestionsId}`,
         {},
         { headers: { Authorization: `Bearer ${idToken}` } }
       );
 
       // persist active ID
-      localStorage.setItem("activeQuestionId", q.questionId);
-      await fetchAndAssignRandomQuestions(q.questionId);
+      localStorage.setItem("activeQuestionsId", q.QuestionsId);
+      await fetchAndAssignRandomQuestions(q.QuestionsId);
 
       setActivationMessage(`Course "${q.CourseTitle}" activated.`);
     } catch (err) {
@@ -88,7 +88,7 @@ const QuestionsList: React.FC = () => {
   };
 
   const handleDeactivateCourse = () => {
-    localStorage.removeItem("activeQuestionId");
+    localStorage.removeItem("activeQuestionsId");
     localStorage.removeItem("assignedQuestions");
     // you already have setStudentQuestions in context
     setStudentQuestions([]);
@@ -106,11 +106,11 @@ const QuestionsList: React.FC = () => {
     if (!targetDocument) return;
     try {
       const idToken = await GetToken();
-      await axios.delete(`${baseUrl}/questions/${targetDocument.questionId}`, {
+      await axios.delete(`${baseUrl}/questions/${targetDocument.QuestionsId}`, {
         headers: { Authorization: `Bearer ${idToken}` },
       });
-      deleteQuestionFromContext(targetDocument.questionId);
-      if (selectedQuestion?.questionId === targetDocument.questionId) {
+      deleteQuestionFromContext(targetDocument.QuestionsId);
+      if (selectedQuestion?.QuestionsId === targetDocument.QuestionsId) {
         setSelectedQuestion(null);
       }
     } catch {
@@ -186,7 +186,7 @@ const QuestionsList: React.FC = () => {
     try {
       const idToken = await GetToken();
       const response = await axios.patch(
-        `${baseUrl}/questions/${editedQuestion.questionId}`,
+        `${baseUrl}/questions/${editedQuestion.QuestionsId}`,
         editedQuestion,
         {
           headers: { Authorization: `Bearer ${idToken}` },
@@ -240,10 +240,10 @@ const QuestionsList: React.FC = () => {
             <div className="bg-white p-4 shadow-md rounded overflow-auto">
               <ul className="space-y-2">
               {filteredQuestions.map((q) => {
-                    const isActive = localStorage.getItem("activeQuestionId") === q.questionId;
+                    const isActive = localStorage.getItem("activeQuestionsId") === q.QuestionsId;
                     return (
                       <li
-                        key={q.questionId}
+                        key={q.QuestionsId}
                         className={`flex justify-between items-center border p-2 rounded-md ${
                           isActive ? "bg-green-100" : "bg-gray-50"
                         } hover:bg-gray-100`}
