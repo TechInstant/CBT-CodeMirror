@@ -9,6 +9,8 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { StudentsProvider } from './Context/StudentContext';
 import { QuestionsProvider } from './Context/QuestionContext';
 import Editor from './components/Editor';
+import { SubmissionsProvider } from './Context/SubmissionsContext';
+import AlreadySubmitted from './components/Already_Submitted';
 
 function App() {
   return (
@@ -17,6 +19,7 @@ function App() {
       <div>
       <StudentsProvider>
         <QuestionsProvider>
+        <SubmissionsProvider>
         <Routes>
         <Route path="/" element={<Login />} />   
           <Route element={<ProtectedRoute />}>
@@ -25,8 +28,10 @@ function App() {
           <Route path="/welcomePage" element={<WelcomePage />} />
           <Route path="/editor" element={<Editor />} />
           <Route path="/adminUpload" element={<AdminUpload />} />
+          <Route path="/already_submitted" element={<AlreadySubmitted />} />
           </Route>
         </Routes>
+        </SubmissionsProvider>
         </QuestionsProvider>
         </StudentsProvider>
       </div>

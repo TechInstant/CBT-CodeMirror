@@ -68,11 +68,10 @@ export const QuestionsProvider: React.FC<{ children: ReactNode }> = ({ children 
 
       let qq: StudentQuestion[];
 
-      // If the API already returned StudentQuestion objects, just use them:
       if (raw.length > 0 && typeof raw[0] === "object" && "questionText" in raw[0]) {
         qq = raw as StudentQuestion[];
       } else {
-        // Otherwise it's an array of IDs, so we look them up in activeDoc.Questions
+   
         qq = (raw as string[]).map((qid) => {
           const entry = activeDoc.Questions[qid];
           const text =

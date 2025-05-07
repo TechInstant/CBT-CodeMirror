@@ -1,19 +1,36 @@
-// src/components/Editor.tsx
 import React, { useState, useEffect, useRef } from "react";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { python } from "@codemirror/lang-python";
 import { javascript } from "@codemirror/lang-javascript";
-import CodeMirror from "@uiw/react-codemirror";
+import CodeMirror, { EditorView } from "@uiw/react-codemirror";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { material } from "@uiw/codemirror-theme-material";
 import { dracula } from "@uiw/codemirror-theme-dracula";
-import { loadPyodide } from "pyodide";
 import { formatString } from "../components/FormatString";
 import { StudentQuestion, useQuestions } from "../Context/QuestionContext";
 import { FaSpinner } from "react-icons/fa";
 import { gradeWithGroqAI } from "../components/AutoGrade";
-import { saveSubmissionToFirebase } from "../saveScores";
+import { baseUrl, GetToken } from "../App";
+import axios from "axios";
+// import { loadPyodide } from "pyodide";
+
+
+interface SubmissionRequest {
+  studentId: string;
+  studentName: string;
+  department: string;
+  timestamp: string;
+  responses: {
+    QuestionsId: string;
+    questionText: string;
+    code: string;
+    output: string;
+    score: number;
+    totalScore: number;
+  }[];
+}
+
 
 const formatTime = (seconds: number) => {
   const m = Math.floor(seconds / 60).toString().padStart(2, "0");
@@ -21,16 +38,48 @@ const formatTime = (seconds: number) => {
   return `${m}:${s}`;
 };
 
+const PYODIDE_CDN = "https://cdn.jsdelivr.net/pyodide/v0.27.4/full/";
+// helper to dynamically load the Pyodide script if needed
+function ensurePyodideScript(): Promise<void> {
+  if ((window as any).loadPyodide) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = `${PYODIDE_CDN}pyodide.js`;
+    script.crossOrigin = "anonymous";
+    script.onload = () => resolve();
+    script.onerror = (e) => reject(new Error(`Failed to load Pyodide script: ${e}`));
+    document.head.appendChild(script);
+  });
+}
+
+const noClipboard = EditorView.domEventHandlers({
+  copy: (e) => { e.preventDefault(); return true; },
+  cut:  (e) => { e.preventDefault(); return true; },
+  paste:(e) => { e.preventDefault(); return true; }
+});
+
 const Editor: React.FC = () => {
-  /*** 1) Code + console state ***/
   const [code, setCode] = useState("print('Hello, World!')");
   const [consoleOutput, setConsoleOutput] = useState("");
   const [consoleOpen, setConsoleOpen] = useState(false);
 
-  /*** 2) Pyodide ***/
   const [pyodide, setPyodide] = useState<any>(null);
+  const isUnloading = useRef(false);
+  
   useEffect(() => {
-    loadPyodide().then((py) => {
+    let mounted = true;
+
+    ensurePyodideScript()
+    .then(() =>
+      // @ts-ignore: now loadPyodide is on window
+      (window as any).loadPyodide({
+        indexURL: PYODIDE_CDN
+      })
+    )
+    .then((py: any) => {
+      if (!mounted) return;
       py.setStdout({ batched: (t: string) => setConsoleOutput((o) => o + "\n" + t) });
       py.setStderr({ batched: (e: string) => setConsoleOutput((o) => o + "\nError: " + e) });
       py.runPython(`
@@ -43,16 +92,23 @@ def browser_input(prompt_text=""):
 builtins.input = browser_input
       `);
       setPyodide(py);
+    })
+    .catch(err => {
+      console.error(err);
+      setConsoleOutput("Failed to load Python runtime.");
     });
+
+  return () => {
+    mounted = false;
+  };
   }, []);
 
-  /*** 3) Theme & language ***/
+ 
   const themeMap = { "one-dark": oneDark, material, dracula };
   const languageMap = { python: python(), javascript: javascript() };
   const [theme, setTheme] = useState(oneDark);
   const [language, setLanguage] = useState(python());
 
-  /*** 4) Questions from context ***/
   const {
     questions,
     loading: questionsLoading,
@@ -61,7 +117,6 @@ builtins.input = browser_input
   } = useQuestions();
   const studentLoading = questionsLoading || studentQuestions.length === 0;
 
-  /*** 5) Pagination ***/
   const [currentIndex, setCurrentIndex] = useState(() => {
     const saved = localStorage.getItem("currentQuestionIndex");
     return saved ? +saved : 0;
@@ -70,7 +125,6 @@ builtins.input = browser_input
     localStorage.setItem("currentQuestionIndex", String(currentIndex));
   }, [currentIndex]);
 
-  /*** 6) Timer ***/
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [timerStarted, setTimerStarted] = useState(false);
   const firstLoad = useRef(false);
@@ -118,7 +172,6 @@ builtins.input = browser_input
     return () => clearInterval(iv);
   }, [timerStarted, timeLeft]);
 
-  /*** 7) Per-question code/output maps ***/
   const [questionCodeMap, setQuestionCodeMap] = useState<Record<string, string>>({});
   const [questionOutputMap, setQuestionOutputMap] = useState<Record<string, string>>({});
 
@@ -127,14 +180,12 @@ builtins.input = browser_input
   const questionId = currentQuestion?.QuestionsId;
   const questionText = currentQuestion?.questionText || "";
 
-  /*** 8) Snapshot only when user switches questions ***/
   useEffect(() => {
     if (!questionId) return;
     setQuestionCodeMap((m) => ({ ...m, [questionId]: code }));
     setQuestionOutputMap((m) => ({ ...m, [questionId]: consoleOutput }));
   }, [currentIndex, questionId]);
 
-  /*** 9) Restore on initial load ***/
   useEffect(() => {
     if (!studentQuestions.length) return;
     const firstId = studentQuestions[0].QuestionsId;
@@ -144,7 +195,6 @@ builtins.input = browser_input
   }, [studentQuestions]);
 
   
- /*** 10) Run code (wrapped for interactive input) ***/
 const handleRunCode = async () => {
   setConsoleOpen(true);
   if (!pyodide) {
@@ -190,54 +240,107 @@ output
   }
 };
 
-  /*** 11) Submit ***/
+// 2) tab-switch vs reload/close
+useEffect(() => {
+  const onBeforeUnload = () => { isUnloading.current = true; };
+  const onVisibilityChange = () => {
+    if (document.visibilityState === "hidden" && !isUnloading.current) {
+      handleSubmit();
+    }
+  };
+  window.addEventListener("beforeunload", onBeforeUnload);
+  document.addEventListener("visibilitychange", onVisibilityChange);
+  return () => {
+    window.removeEventListener("beforeunload", onBeforeUnload);
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+  };
+}, []);
+
+
   const [hasSubmitted, setHasSubmitted] = useState(false);
   async function handleSubmit() {
-    // merge latest pane
     const codeMap = { ...questionCodeMap, [questionId]: code };
-    const outMap = { ...questionOutputMap, [questionId]: consoleOutput };
-
-    // sanitize studentId
-    const user = JSON.parse(localStorage.getItem("userData") || "{}");
-    const rawId = user.StudentId || user.MatricNumber || "";
-    const studentId = rawId.replace(/\//g, "_");
-    const studentName = `${user.FirstName || ""} ${user.LastName || ""}`.trim();
-
-    // grade all
+    const outMap  = { ...questionOutputMap, [questionId]: consoleOutput };
+  
     const responses = await Promise.all(
       studentQuestions.map(async ({ QuestionsId: qid, questionText: qt }) => {
         const sc = codeMap[qid] ?? "";
-        const so = outMap[qid] ?? "";
+        const so = outMap[qid]  ?? "";
         let score = 0;
         try {
           score = await gradeWithGroqAI(sc, so, qt);
         } catch (e) {
-          console.warn("Grading error:", e);
+          console.warn("Grading failed for", qid, e);
         }
-        return { QuestionsId: qid, questionText: qt, code: sc, output: so, score, totalScore: 10 };
+        return {
+          QuestionsId:  qid,
+          questionText: qt,
+          code:         sc,
+          output:       so,
+          score,
+          totalScore:  10,
+        };
       })
     );
+  
+    const user     = JSON.parse(localStorage.getItem("userData") || "{}");
+    const rawId    = user.StudentId || user.MatricNumber || "";
+    const studentId= rawId.replace(/\//g, "_");
+    const studentName = `${user.FirstName || ""} ${user.LastName || ""}`.trim();
+    const department = user.Department || user.DepartmentName || "";
 
-    const payload = { studentId, studentName, timestamp: new Date().toISOString(), responses };
-    // strip undefined
-    const clean = JSON.parse(JSON.stringify(payload));
-    const ok = await saveSubmissionToFirebase(clean);
-    if (ok) {
+  
+
+    const payload: SubmissionRequest = {
+      studentId,
+      studentName,
+      department,
+      timestamp: new Date().toISOString(),
+      responses,
+    };
+  
+    try {
+      const idToken = await GetToken();
+      await axios.post(
+        `${baseUrl}/submissions`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
       toast.success("Submitted successfully!", { autoClose: 2000 });
       setHasSubmitted(true);
-      ["examTimeLeft", "assignedQuestions", "currentQuestionIndex", "userData"].forEach((k) =>
-        localStorage.removeItem(k)
-      );
-      setTimeout(() => (window.location.href = "/"), 5000);
-    } else {
-      toast.error("Error saving submission.");
+
+      ["examTimeLeft", "assignedQuestions", "currentQuestionIndex", "userData"]
+        .forEach(k => localStorage.removeItem(k));
+      setTimeout(() => (window.location.href = "/"), 3000);
+  
+    } catch (err: any) {
+      if (err.response) {
+        const { status, data } = err.response;
+        if (status === 429 && data.redirect) {
+          toast.error(data.message, { autoClose: 2000 });
+          setTimeout(() => {
+            window.location.href = data.redirect;
+          }, 2000);
+          return;
+        }
+
+        console.error("Submission failed:", data);
+        toast.error("Submission error: " + (data.message || err.response.statusText));
+      } else {
+        console.error("Network error while submitting:", err);
+        toast.error("Network error—please try again.");
+      }
     }
   }
 
-  /*** 12) Clear console ***/
   const handleClearConsole = () => setConsoleOutput("");
 
-  /*** 13) Render ***/
   return (
     <div className="h-screen flex flex-col">
       {/* header */}
@@ -293,7 +396,6 @@ output
 
         {/* editor + console */}
         <div className="w-2/3 p-4 flex flex-col bg-white border-l">
-          {/* controls */}
           <div className="mb-4 flex space-x-4">
             <select onChange={(e) => setTheme(themeMap[e.target.value as keyof typeof themeMap])}>
               {Object.keys(themeMap).map((t) => (
@@ -310,18 +412,28 @@ output
               ))}
             </select>
           </div>
-          <CodeMirror value={code} height="300px" extensions={[language]} theme={theme} onChange={setCode} />
+          <CodeMirror 
+          value={code} 
+          height="300px" 
+          extensions={[language, noClipboard]} 
+          theme={theme} 
+          onChange={setCode} />
 
           {consoleOpen && (
-            <div className="mt-4 bg-black text-white p-2 h-40 overflow-auto">
-              <div className="flex justify-between mb-1">
-                <strong>Console Output</strong>
-                <button onClick={handleClearConsole}>Clear</button>
-                <button onClick={() => setConsoleOpen(false)}>Hide</button>
+            <div className="mt-4">
+              <div className="w-full bg-black text-white h-40 overflow-auto flex justify-between">
+                <div className="flex-1 p-2">
+                  <p className="text-lg font-bold mb-2">Console Output:</p>
+                  <pre>{consoleOutput}</pre>
+                </div>
+              <div className="">
+                <button onClick={handleClearConsole} className="px-2 py-1  text-white rounded-md hover:bg-gray-500">Clear</button>
+                <button onClick={() => setConsoleOpen(!consoleOpen)} className="px-2 py-1  text-white rounded-md hover:bg-gray-500">Hide</button>
               </div>
-              <pre className="whitespace-pre-wrap">{consoleOutput}</pre>
+              </div>
             </div>
-          )}
+          )}        
+
         </div>
       </div>
 

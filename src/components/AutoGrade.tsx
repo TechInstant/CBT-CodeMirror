@@ -19,7 +19,8 @@ export async function gradeWithGroqAI(code: string, output: string, question: st
         messages: [
           {
             role: "system",
-            content: `You are a strict but fair code evaluator. Score the student's code on a scale of 0 to 10 based on how well it answers the question.
+            content: `You are a strict but fair code evaluator. Score the student's code on a scale of 0 to 10 based on
+            wa how well it answers the question.
 
 - If the code is completely missing or empty, return a score of 0.
 - If not, evaluate the code written against the question it aims to solve and return a numerical value between 1 and 10.

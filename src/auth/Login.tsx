@@ -90,6 +90,7 @@ const Login: React.FC = () => {
         );
         if (!matchedAdmin) {
           setError("Account not found. Please check your email or sign up.");
+          setShowSignUp(true);
           return;
         }
         try {
@@ -102,7 +103,7 @@ const Login: React.FC = () => {
           localStorage.setItem("userData", JSON.stringify(matchedAdmin));
           navigate("/AdminDashboard");
         } catch (authError) {
-          console.error("Sign-in failed:", authError);
+          console.log("Sign-in failed:", authError);
           setError("Invalid email or password.");
         }
       } else {
@@ -119,7 +120,7 @@ const Login: React.FC = () => {
           localStorage.setItem("userData", JSON.stringify(matchedStudent));
 
           const assignActiveQuestion = async () => {
-            const activeQuestion = getActiveQuestion(); // this gets the active question from context
+            const activeQuestion = getActiveQuestion(); 
             
             if (activeQuestion) {
               await fetchAndAssignRandomQuestions(activeQuestion.QuestionsId);
@@ -128,7 +129,7 @@ const Login: React.FC = () => {
             }
           };
 
-          await assignActiveQuestion(); // Ensure active question is set and questions are fetched
+          await assignActiveQuestion(); 
           navigate("/welcomePage");
         } else {
           setError("Account not found or wrong credentials.");
