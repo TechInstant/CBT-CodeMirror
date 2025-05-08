@@ -139,26 +139,27 @@ const Login: React.FC = () => {
   });
 
   return (
-    <div className="max-h-screen flex flex-col items-center justify-center bg-white">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white px-4">
       <div className="w-full bg-blue-400 py-4 text-center text-white text-xl font-bold">
         CSC-M
       </div>
+  
       <div className="relative w-full flex justify-center my-4">
-        <img src="/oau.png" alt="logo" className="w-32 opacity-70" />
+        <img src="/oau.png" alt="logo" className="w-24 md:w-32 opacity-70" />
       </div>
-
+  
       {showSignUp ? (
-        <div>
+        <div className="w-full max-w-md px-4">
           <SignUpForm />
           <button
-            className="mt-4 text-blue-600 underline"
+            className="mt-4 text-blue-600 underline text-sm"
             onClick={() => setShowSignUp(false)}
           >
             Back to Login
           </button>
         </div>
       ) : (
-        <div className="w-full max-w-md p-8 bg-blue-50 rounded-lg shadow-md mt-10">
+        <div className="w-full max-w-md p-6 sm:p-8 bg-blue-50 rounded-lg shadow-md mt-6 sm:mt-10">
           <p className="text-center text-lg font-semibold text-gray-900 mb-4">
             LOGIN
           </p>
@@ -174,7 +175,7 @@ const Login: React.FC = () => {
                 <input
                   type="text"
                   name="username"
-                  className="w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
                   placeholder="Enter your matric number"
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
@@ -188,7 +189,7 @@ const Login: React.FC = () => {
                 </p>
               )}
             </div>
-
+  
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Password
@@ -200,8 +201,8 @@ const Login: React.FC = () => {
                 <input
                   type={showPassword ? "text" : "password"}
                   name="password"
-                  className="w-full pl-10 pr-10 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  placeholder=" "
+                  className="w-full pl-10 pr-10 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                  placeholder="Enter password"
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
                   value={formik.values.password}
@@ -220,12 +221,14 @@ const Login: React.FC = () => {
                 </p>
               )}
             </div>
+  
             {error && (
               <p className="text-red-500 text-sm text-center">{error}</p>
             )}
+  
             <button
               type="submit"
-              className="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
             >
               Login
             </button>
@@ -234,6 +237,7 @@ const Login: React.FC = () => {
       )}
     </div>
   );
+  
 };
 
 export default Login;

@@ -344,7 +344,7 @@ useEffect(() => {
   return (
     <div className="h-screen flex flex-col">
       {/* header */}
-      <div className="bg-blue-600 text-white p-3 text-center font-bold relative">
+      <div className="bg-blue-600 text-white p-3 text-center font-bold text-lg sm:text-xl relative">
         Code Editor
         <span
    className={
@@ -363,11 +363,11 @@ useEffect(() => {
       <ToastContainer />
 
       {/* body */}
-      <div className="flex flex-1">
+      <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
         {/* sidebar */}
-        <div className="w-1/3 p-4 bg-gray-100 overflow-auto">
+        <div className="w-full md:w-1/3 p-4 bg-gray-100 overflow-auto">
           <h2 className="font-bold">Question {currentIndex + 1}</h2>
-          <div className="mt-2">
+          <div className="mt-2 whitespace-pre-wrap">
             {studentLoading ? (
               <div className="flex items-center justify-center h-20">
                 <FaSpinner className="animate-spin text-3xl text-blue-600" />
@@ -395,7 +395,7 @@ useEffect(() => {
         </div>
 
         {/* editor + console */}
-        <div className="w-2/3 p-4 flex flex-col bg-white border-l">
+        <div className="w-full md:w-2/3 flex flex-col p-4 overflow-hidden">
           <div className="mb-4 flex space-x-4">
             <select onChange={(e) => setTheme(themeMap[e.target.value as keyof typeof themeMap])}>
               {Object.keys(themeMap).map((t) => (
@@ -412,27 +412,36 @@ useEffect(() => {
               ))}
             </select>
           </div>
+          <div className="flex-1 overflow-hidden border rounded">
           <CodeMirror 
           value={code} 
           height="300px" 
           extensions={[language, noClipboard]} 
           theme={theme} 
           onChange={setCode} />
-
+          </div>
           {consoleOpen && (
-            <div className="mt-4">
-              <div className="w-full bg-black text-white h-40 overflow-auto flex justify-between">
-                <div className="flex-1 p-2">
-                  <p className="text-lg font-bold mb-2">Console Output:</p>
-                  <pre>{consoleOutput}</pre>
+            <div className="mt-2 bg-black text-white p-2 h-40 overflow-auto rounded font-mono text-sm flex flex-col">
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-lg font-semibold">Console Output:</p>
+                <div className="space-x-2">
+                  <button
+                    onClick={handleClearConsole}
+                    className="px-2 py-1 text-sm text-red-500 hover:underline hover:bg-gray-700 rounded"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    onClick={() => setConsoleOpen(!consoleOpen)}
+                    className="px-2 py-1 text-white hover:bg-gray-700 rounded"
+                  >
+                    Hide
+                  </button>
                 </div>
-              <div className="">
-                <button onClick={handleClearConsole} className="px-2 py-1  text-white rounded-md hover:bg-gray-500">Clear</button>
-                <button onClick={() => setConsoleOpen(!consoleOpen)} className="px-2 py-1  text-white rounded-md hover:bg-gray-500">Hide</button>
               </div>
-              </div>
+              <pre className="flex-1 overflow-auto">{consoleOutput}</pre>
             </div>
-          )}        
+          )}
 
         </div>
       </div>
