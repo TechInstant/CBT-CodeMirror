@@ -35,7 +35,7 @@ const AdminDashboard: React.FC = () => {
         });
         setStudentCount(response.data.length);
       } catch (error) {
-        console.error("Error fetching students:", error);
+        // console.error("Error fetching students:", error);
       }
     };
     fetchStudentCount();

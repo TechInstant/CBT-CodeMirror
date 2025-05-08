@@ -82,7 +82,7 @@ const QuestionsList: React.FC = () => {
 
       setActivationMessage(`Course "${q.CourseTitle}" activated.`);
     } catch (err) {
-      console.log(err);
+      // console.log(err);
       setActivationMessage("Failed to activate the course.");
     }
   };
@@ -114,7 +114,7 @@ const QuestionsList: React.FC = () => {
         setSelectedQuestion(null);
       }
     } catch {
-      console.log("Error deleting question:");
+      // console.log("Error deleting question:");
     } finally {
       setShowDocumentDeleteModal(false);
       setTargetDocument(null);
@@ -198,7 +198,7 @@ const QuestionsList: React.FC = () => {
       setIsEditing(false);
       setEditedQuestion(null);
     } catch (error) {
-      console.error("Error updating question:", error);
+      // console.error("Error updating question:", error);
     }
   };
 

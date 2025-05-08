@@ -76,7 +76,7 @@ const TeacherSubmissions: React.FC = () => {
       setSelected(null);
       toast.success("Overrides saved successfully!");
     } catch (err) {
-      console.error(err);
+      // console.error(err);
       toast.error("Failed to save overrides");
     }
   };

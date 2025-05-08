@@ -44,7 +44,7 @@ export const SubmissionsProvider: React.FC<{ children: ReactNode }> = ({ childre
       );
       setSubmissions(resp.data);
     } catch (err) {
-      console.error("Failed to load submissions:", err);
+      // console.error("Failed to load submissions:", err);
     } finally {
       setLoading(false);
     }

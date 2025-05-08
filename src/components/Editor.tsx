@@ -270,7 +270,7 @@ useEffect(() => {
         try {
           score = await gradeWithGroqAI(sc, so, qt);
         } catch (e) {
-          console.warn("Grading failed for", qid, e);
+          // console.warn("Grading failed for", qid, e);
         }
         return {
           QuestionsId:  qid,
@@ -330,10 +330,10 @@ useEffect(() => {
           return;
         }
 
-        console.error("Submission failed:", data);
+        // console.error("Submission failed:", data);
         toast.error("Submission error: " + (data.message || err.response.statusText));
       } else {
-        console.error("Network error while submitting:", err);
+        // console.error("Network error while submitting:", err);
         toast.error("Network error—please try again.");
       }
     }

@@ -46,7 +46,7 @@ export const QuestionsProvider: React.FC<{ children: ReactNode }> = ({ children 
       );
       setQuestions(resp.data);
     } catch (e) {
-      console.error("Error fetching questions:", e);
+      // console.error("Error fetching questions:", e);
     } finally {
       setLoading(false);
     }
@@ -88,7 +88,7 @@ export const QuestionsProvider: React.FC<{ children: ReactNode }> = ({ children 
       localStorage.setItem("assignedQuestions", JSON.stringify(qq));
       localStorage.setItem("activeQuestionsId", activeQuestionsId);
     } catch (err) {
-      console.error("Error fetching randomized questions:", err);
+      // console.error("Error fetching randomized questions:", err);
     }
   };
 
@@ -98,7 +98,7 @@ export const QuestionsProvider: React.FC<{ children: ReactNode }> = ({ children 
     if (!questions.length) return;
     const active = questions.find((q) => q.isActive);
     if (!active) {
-      console.error("No active question in context!");
+      // console.error("No active question in context!");
       return;
     }
 

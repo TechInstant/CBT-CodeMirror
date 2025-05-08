@@ -30,7 +30,7 @@ export const StudentsProvider: React.FC<{ children: ReactNode }> = ({ children }
       });
       setStudents(response.data);
     } catch (error) {
-      console.error("Error fetching students:", error);
+      // console.error("Error fetching students:", error);
     }
   };
 

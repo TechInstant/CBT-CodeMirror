@@ -100,16 +100,16 @@ const AdminUpload: React.FC = () => {
 
     for (const student of studentsData) {
       if (existingStudentIds.has(student.StudentId)) {
-        console.log(`Student with ID ${student.StudentId} already exists.`);
+        // console.log(`Student with ID ${student.StudentId} already exists.`);
         continue;
       }
       try {
         await axios.post(`${baseUrl}/students`, student, {
           headers: { Authorization: `Bearer ${idToken}` },
         });
-        console.log(`Student with ID ${student.StudentId} uploaded successfully.`);
+        // console.log(`Student with ID ${student.StudentId} uploaded successfully.`);
       } catch (error) {
-        console.error(`Error uploading student ${student.StudentId}:`, error);
+        // console.error(`Error uploading student ${student.StudentId}:`, error);
       }
     }
 
@@ -133,7 +133,7 @@ const AdminUpload: React.FC = () => {
       toast.success("Data uploaded successfully!");
       navigate("/AdminDashboard");
     } catch (error) {
-      console.error("Error uploading data:", error);
+      // console.error("Error uploading data:", error);
       toast.error("Error uploading data.");
     }
   };

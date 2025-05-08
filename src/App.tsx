@@ -62,7 +62,7 @@ export default App;
       
           return idToken;
         } catch (error: any) {
-          console.log(error.message);
+         
         }
       };
 

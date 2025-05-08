@@ -63,7 +63,7 @@ export const SignUpForm = () => {
 
         navigate("/");
       } catch (error) {
-        console.error("Error creating user:", error);
+        // console.error("Error creating user:", error);
         if (auth.currentUser) {
           await deleteUser(auth.currentUser);
         }

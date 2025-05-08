@@ -1,11 +1,11 @@
 import { grader } from "../App";
 
 export async function gradeWithGroqAI(code: string, output: string, question: string): Promise<number> {
-  console.log("Grading with Groq AI:", {
-    question,
-    code,
-    output,
-  });
+  // console.log("Grading with Groq AI:", {
+  //   question,
+  //   code,
+  //   output,
+  // });
 
   try {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -42,20 +42,20 @@ Only respond with the number score on a single line. Do not explain or justify.`
       }),
     });
 
-    const clonedResponse = response.clone(); // safe debug
-    const raw = await clonedResponse.text();
-    console.log("Groq API raw response:", raw);
+    // const clonedResponse = response.clone(); // safe debug
+    // const raw = await clonedResponse.text();
+    // console.log("Groq API raw response:", raw);
 
     const data = await response.json();
     const message = data.choices?.[0]?.message?.content?.trim() ?? "";
-    console.log("Raw message from Groq:", message);
+    // console.log("Raw message from Groq:", message);
 
     const match = message.match(/\d+/);
     const score = match ? parseInt(match[0]) : 0;
 
     return score;
   } catch (err) {
-    console.error("Grading failed:", err);
+    // console.error("Grading failed:", err);
     return 0;
   }
 }

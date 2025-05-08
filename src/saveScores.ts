@@ -22,7 +22,7 @@ export async function saveSubmissionToFirebase(attempt: any) {
 
     return true;
   } catch (err) {
-    console.error("Error saving submission:", err);
+    
     return false;
   }
 }
