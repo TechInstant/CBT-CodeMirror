@@ -11,7 +11,7 @@ import * as Yup from "yup";
 import { baseUrl } from "../App";
 
 export const SignUpForm = () => {
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string>("");
   const navigate = useNavigate();
   const auth = getAuth();
 
@@ -37,37 +37,91 @@ export const SignUpForm = () => {
         .required("Confirm your password"),
     }),
     onSubmit: async (values) => {
+      setError("");
+      let firebaseUser;
       try {
-        setError("");
-
         const userCredential = await createUserWithEmailAndPassword(
           auth,
           values.email,
           values.password
         );
-        const idToken = await userCredential.user.getIdToken();
-        const firebaseUser = userCredential.user;
-
-        const newUser = {
-          UserId: firebaseUser.uid,
-          FirstName: values.firstName,
-          LastName: values.lastName,
-          Email: values.email,
-          Role: values.role,
-          Department: " ",
-        };
-
-        await axios.post(`${baseUrl}/users`, newUser, {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-
-        navigate("/");
-      } catch (error) {
-        // console.error("Error creating user:", error);
-        if (auth.currentUser) {
-          await deleteUser(auth.currentUser);
+        firebaseUser = userCredential.user;
+      } catch (authErr: any) {
+        console.error("Firebase signUp failed →", authErr.code, authErr.message);
+        switch (authErr.code) {
+          case "auth/email-already-in-use":
+            setError("That email is already registered. Try logging in instead.");
+            break;
+          case "auth/invalid-email":
+            setError("Please enter a valid email address.");
+            break;
+          case "auth/weak-password":
+            setError("Password is too weak. It must be at least 8 characters.");
+            break;
+          case "auth/operation-not-allowed":
+            setError("Email/Password sign-up is disabled in Firebase.");
+            break;
+          default:
+            setError(`Firebase error: ${authErr.message}`);
         }
-        setError("Failed to create account");
+        return;
+      }
+
+      let idToken: string;
+      try {
+        idToken = await firebaseUser.getIdToken();
+      } catch (tokenErr: any) {
+        // console.error("Failed to get ID token →", tokenErr);
+        try {
+          await deleteUser(firebaseUser);
+        } catch (delErr) {
+          // console.error("Error deleting Firebase user after token failure →", delErr);
+        }
+        setError("Unable to verify authentication. Please try again.");
+        return;
+      }
+      
+      const newUser = {
+        UserId: firebaseUser.uid,
+        FirstName: values.firstName,
+        LastName: values.lastName,
+        Email: values.email,
+        Role: values.role,
+        Department: " ",
+      };
+
+      try {
+        await axios.post(
+          `${baseUrl}/users`,
+          newUser,
+          { headers: { Authorization: `Bearer ${idToken}` } }
+        );
+        //On success, navigate straight to "/" (your login page)
+        navigate("/AdminDashboard");
+      } catch (backendErr: any) {
+        // console.error(
+        //   "Backend /users failed →",
+        //   backendErr.response?.status,
+        //   backendErr.response?.data
+        // );
+        // Delete the Firebase user to avoid orphaned accounts
+        if (auth.currentUser) {
+          try {
+            await deleteUser(auth.currentUser);
+          } catch (delErr) {
+            // console.error("Error deleting Firebase user after backend failure →", delErr);
+          }
+        }
+        if (backendErr.response && backendErr.response.data) {
+          const backendData = backendErr.response.data;
+          setError(
+            backendData.error ||
+            backendData.message ||
+            `Backend error (status ${backendErr.response.status})`
+          );
+        } else {
+          setError(backendErr.message );
+        }
       }
     },
   });
@@ -182,8 +236,9 @@ export const SignUpForm = () => {
           <button
             type="submit"
             className="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+            disabled={formik.isSubmitting}
           >
-            Create Account
+            {formik.isSubmitting ? "Creating..." : "Create Account"}
           </button>
         </form>
       </div>

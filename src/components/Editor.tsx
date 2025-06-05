@@ -240,7 +240,6 @@ output
   }
 };
 
-// 2) tab-switch vs reload/close
 useEffect(() => {
   const onBeforeUnload = () => { isUnloading.current = true; };
   const onVisibilityChange = () => {
