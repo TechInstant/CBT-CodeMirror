@@ -8,6 +8,7 @@
 
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
+import * as path from 'path';
 
 export default defineConfig({
   plugins: [tailwindcss()],
@@ -16,6 +17,11 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ["pyodide"], // ✅ Exclude Pyodide from optimization
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
   },
 });
 

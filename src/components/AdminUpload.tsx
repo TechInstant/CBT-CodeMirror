@@ -95,8 +95,6 @@ const AdminUpload: React.FC = () => {
     }
     try {
       const idToken = await GetToken();
-
-      // Fetch existing students
       const existingResponse = await axios.get(`${baseUrl}/students`, {
         headers: { Authorization: `Bearer ${idToken}` },
       });
@@ -114,7 +112,7 @@ const AdminUpload: React.FC = () => {
             headers: { Authorization: `Bearer ${idToken}` },
           });
         } catch {
-          // optionally log
+
         }
       }
 
@@ -174,10 +172,10 @@ const AdminUpload: React.FC = () => {
                 <p className="text-xs text-gray-600 mb-1">
                   Required headers (case-sensitive):<br/>
                   <code>Names,MatricNo,Department,Password</code><br/>
-                  - <strong>Names</strong>: full name, e.g. "Doe John".<br/>
-                  - <strong>MatricNo</strong>: student ID.<br/>
-                  - <strong>Department</strong>: e.g. "Computer Science".<br/>
-                  - <strong>Password</strong>: initial password (or blank).<br/>
+                  <strong>Names</strong>: full name, e.g. "Nuel John".<br/>
+                  <strong>MatricNo</strong>: student ID.<br/>
+                  <strong>Department</strong>: e.g. "Computer Science".<br/>
+                  {/* - <strong>Password</strong>(or blank).<br/> */}
                 </p>
                 <table className="w-full text-xs border border-gray-300">
                   <thead>
@@ -185,7 +183,7 @@ const AdminUpload: React.FC = () => {
                       <th className="border p-1">Names</th>
                       <th className="border p-1">MatricNo</th>
                       <th className="border p-1">Department</th>
-                      <th className="border p-1">Password</th>
+                      {/* <th className="border p-1">Password</th> */}
                     </tr>
                   </thead>
                   <tbody>
@@ -193,7 +191,7 @@ const AdminUpload: React.FC = () => {
                       <td className="border p-1">Doe John</td>
                       <td className="border p-1">CS12345</td>
                       <td className="border p-1">Computer Science</td>
-                      <td className="border p-1">pass123</td>
+                      {/* <td className="border p-1">pass123</td> */}
                     </tr>
                   </tbody>
                 </table>

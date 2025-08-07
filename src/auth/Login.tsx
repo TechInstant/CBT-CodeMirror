@@ -101,7 +101,7 @@ const Login: React.FC = () => {
           );
           console.log("Admin signed in:", userCredential.user);
           localStorage.setItem("userData", JSON.stringify(matchedAdmin));
-          navigate("/AdminDashboard");
+          navigate("/admindashboard");
         } catch (authError) {
           // console.log("Sign-in failed:", authError);
           setError("Invalid email or password.");
