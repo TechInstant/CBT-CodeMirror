@@ -81,11 +81,10 @@ const Login: React.FC = () => {
       const isAdmin = values.username.includes("@");
 
       if (isAdmin) {
-        if (!adminData || adminData.length === 0) {
-          setError("Admin data is missing. Try again later.");
-          return;
-        }
-        const matchedAdmin = adminData.find(
+        // An empty admin list is the normal state of a fresh project, not an
+        // error. Falling through to sign-up is what lets the first admin be
+        // created; bailing out here left a new deployment with no way in.
+        const matchedAdmin = (adminData ?? []).find(
           (user) => user.Email === values.username
         );
         if (!matchedAdmin) {

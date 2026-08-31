@@ -58,10 +58,19 @@ export const QuestionsProvider: React.FC<{ children: ReactNode }> = ({ children 
       const activeDoc = questions.find((q) => q.QuestionsId === activeQuestionsId);
       if (!activeDoc) return;
 
+      // Sending the studentId makes the assignment sticky: the server records the
+      // subset once and returns that same subset on every later call, so clearing
+      // the browser mid-exam no longer hands out a fresh paper.
+      const user = JSON.parse(localStorage.getItem("userData") || "{}");
+      const studentId: string = user.StudentId || user.MatricNumber || "";
+
       const idToken = await GetToken();
       const resp = await axios.get<{ data: any[] }>(
         `${baseUrl}/questions/randomized/${activeDoc.QuestionsId}`,
-        { headers: { Authorization: `Bearer ${idToken}` } }
+        {
+          headers: { Authorization: `Bearer ${idToken}` },
+          ...(studentId ? { params: { studentId } } : {}),
+        }
       );
 
       const raw = resp.data.data;
