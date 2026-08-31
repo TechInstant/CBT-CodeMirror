@@ -10,25 +10,36 @@ import { dracula } from "@uiw/codemirror-theme-dracula";
 import { formatString } from "../components/FormatString";
 import { StudentQuestion, useQuestions } from "../Context/QuestionContext";
 import { FaSpinner } from "react-icons/fa";
-import { gradeWithGroqAI } from "../components/AutoGrade";
 import { baseUrl, GetToken } from "../App";
 import axios from "axios";
 // import { loadPyodide } from "pyodide";
 
+
+interface AttemptTelemetry {
+  startedAt: string;
+  durationSeconds: number;
+  runCounts: Record<string, number>;
+  tabSwitchCount: number;
+  blockedClipboardCount: number;
+  submitReason: "manual" | "timer" | "tab-switch";
+  userAgent: string;
+}
 
 interface SubmissionRequest {
   studentId: string;
   studentName: string;
   department: string;
   timestamp: string;
+  paperId: string;
+  // Scores are assigned server-side. The client sends the work, not the marks.
   responses: {
     QuestionsId: string;
     questionText: string;
     code: string;
     output: string;
-    score: number;
     totalScore: number;
   }[];
+  telemetry: AttemptTelemetry;
 }
 
 
@@ -54,11 +65,14 @@ function ensurePyodideScript(): Promise<void> {
   });
 }
 
-const noClipboard = EditorView.domEventHandlers({
-  copy: (e) => { e.preventDefault(); return true; },
-  cut:  (e) => { e.preventDefault(); return true; },
-  paste:(e) => { e.preventDefault(); return true; }
-});
+// Clipboard stays blocked; the difference is that the block is now counted, so an
+// invigilator can see how often it happened instead of only trusting that it did.
+const blockClipboard = (onBlocked: () => void) =>
+  EditorView.domEventHandlers({
+    copy: (e) => { e.preventDefault(); onBlocked(); return true; },
+    cut:  (e) => { e.preventDefault(); onBlocked(); return true; },
+    paste:(e) => { e.preventDefault(); onBlocked(); return true; }
+  });
 
 const Editor: React.FC = () => {
   const [code, setCode] = useState("print('Hello, World!')");
@@ -67,7 +81,24 @@ const Editor: React.FC = () => {
 
   const [pyodide, setPyodide] = useState<any>(null);
   const isUnloading = useRef(false);
-  
+
+  // Behavioural signals sent with the attempt. Refs, not state, so the auto-submit
+  // handlers read live values instead of whatever was current when they mounted.
+  const startedAtRef = useRef<string>(
+    localStorage.getItem("examStartedAt") ?? new Date().toISOString()
+  );
+  const runCountsRef = useRef<Record<string, number>>({});
+  const tabSwitchCountRef = useRef(0);
+  const blockedClipboardRef = useRef(0);
+
+  useEffect(() => {
+    localStorage.setItem("examStartedAt", startedAtRef.current);
+  }, []);
+
+  const clipboardGuard = useRef(
+    blockClipboard(() => { blockedClipboardRef.current += 1; })
+  ).current;
+
   useEffect(() => {
     let mounted = true;
 
@@ -159,7 +190,7 @@ builtins.input = browser_input
   useEffect(() => {
     if (!timerStarted || timeLeft == null) return;
     if (timeLeft <= 0) {
-      handleSubmit();
+      handleSubmit("timer");
       return;
     }
     const iv = setInterval(() => {
@@ -200,6 +231,10 @@ const handleRunCode = async () => {
   if (!pyodide) {
     setConsoleOutput("Python still loading...");
     return;
+  }
+
+  if (questionId) {
+    runCountsRef.current[questionId] = (runCountsRef.current[questionId] ?? 0) + 1;
   }
 
   // Wrap student code to funnel stdout+stderr through StringIO,
@@ -244,7 +279,10 @@ useEffect(() => {
   const onBeforeUnload = () => { isUnloading.current = true; };
   const onVisibilityChange = () => {
     if (document.visibilityState === "hidden" && !isUnloading.current) {
-      handleSubmit();
+      tabSwitchCountRef.current += 1;
+      // Via the ref: this listener is registered once, so calling handleSubmit
+      // directly would submit the answers as they stood at mount time.
+      handleSubmitRef.current("tab-switch");
     }
   };
   window.addEventListener("beforeunload", onBeforeUnload);
@@ -257,47 +295,62 @@ useEffect(() => {
 
 
   const [hasSubmitted, setHasSubmitted] = useState(false);
-  async function handleSubmit() {
+  // The button, the timer and the tab-switch handler can all fire; only one may win.
+  const submittingRef = useRef(false);
+
+  async function handleSubmit(reason: AttemptTelemetry["submitReason"] = "manual") {
+    if (submittingRef.current) return;
+
+    const paperId = localStorage.getItem("activeQuestionsId");
+    if (!paperId) {
+      toast.error("No active paper found — cannot submit.");
+      return;
+    }
+
+    submittingRef.current = true;
+
     const codeMap = { ...questionCodeMap, [questionId]: code };
     const outMap  = { ...questionOutputMap, [questionId]: consoleOutput };
-  
-    const responses = await Promise.all(
-      studentQuestions.map(async ({ QuestionsId: qid, questionText: qt }) => {
-        const sc = codeMap[qid] ?? "";
-        const so = outMap[qid]  ?? "";
-        let score = 0;
-        try {
-          score = await gradeWithGroqAI(sc, so, qt);
-        } catch (e) {
-          // console.warn("Grading failed for", qid, e);
-        }
-        return {
-          QuestionsId:  qid,
-          questionText: qt,
-          code:         sc,
-          output:       so,
-          score,
-          totalScore:  10,
-        };
-      })
-    );
-  
+
+    // Send the work as-is. Grading happens on the server, where a rate-limited
+    // grader can retry instead of quietly recording a zero.
+    const responses = studentQuestions.map(({ QuestionsId: qid, questionText: qt }) => ({
+      QuestionsId:  qid,
+      questionText: qt,
+      code:         codeMap[qid] ?? "",
+      output:       outMap[qid]  ?? "",
+      totalScore:   10,
+    }));
+
     const user     = JSON.parse(localStorage.getItem("userData") || "{}");
     const rawId    = user.StudentId || user.MatricNumber || "";
     const studentId= rawId.replace(/\//g, "_");
     const studentName = `${user.FirstName || ""} ${user.LastName || ""}`.trim();
     const department = user.Department || user.DepartmentName || "";
 
-  
+    const startedAt = startedAtRef.current;
 
     const payload: SubmissionRequest = {
       studentId,
       studentName,
       department,
       timestamp: new Date().toISOString(),
+      paperId,
       responses,
+      telemetry: {
+        startedAt,
+        durationSeconds: Math.max(
+          0,
+          Math.round((Date.now() - new Date(startedAt).getTime()) / 1000)
+        ),
+        runCounts: runCountsRef.current,
+        tabSwitchCount: tabSwitchCountRef.current,
+        blockedClipboardCount: blockedClipboardRef.current,
+        submitReason: reason,
+        userAgent: navigator.userAgent,
+      },
     };
-  
+
     try {
       const idToken = await GetToken();
       await axios.post(
@@ -314,11 +367,13 @@ useEffect(() => {
       toast.success("Submitted successfully!", { autoClose: 2000 });
       setHasSubmitted(true);
 
-      ["examTimeLeft", "assignedQuestions", "currentQuestionIndex", "userData"]
+      ["examTimeLeft", "assignedQuestions", "currentQuestionIndex", "userData", "examStartedAt"]
         .forEach(k => localStorage.removeItem(k));
       setTimeout(() => (window.location.href = "/"), 3000);
-  
+
     } catch (err: any) {
+      submittingRef.current = false;
+
       if (err.response) {
         const { status, data } = err.response;
         if (status === 429 && data.redirect) {
@@ -337,6 +392,11 @@ useEffect(() => {
       }
     }
   }
+
+  // The auto-submit handlers below are registered once, so without this ref they
+  // would capture the answers as they were when the editor first mounted.
+  const handleSubmitRef = useRef(handleSubmit);
+  useEffect(() => { handleSubmitRef.current = handleSubmit; });
 
   const handleClearConsole = () => setConsoleOutput("");
 
@@ -415,7 +475,7 @@ useEffect(() => {
           <CodeMirror 
           value={code} 
           height="300px" 
-          extensions={[language, noClipboard]} 
+          extensions={[language, clipboardGuard]}
           theme={theme} 
           onChange={setCode} />
           </div>
@@ -455,7 +515,7 @@ useEffect(() => {
           {pyodide ? "Run Code" : "Loading Python..."}
         </button>
         <button
-          onClick={handleSubmit}
+          onClick={() => handleSubmit("manual")}
           disabled={hasSubmitted}
           className={`px-4 py-2 text-white rounded ${
             hasSubmitted ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
