@@ -1,8 +1,23 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { toast } from "react-toastify";
+import { Download, X, FileText } from "lucide-react";
 import { useSubmissions, QuestionResponse } from "../Context/SubmissionsContext";
 import { baseUrl, GetToken } from "../App";
-import { toast } from "react-toastify";
+import {
+  Card,
+  CardHeader,
+  PageHeader,
+  Button,
+  Input,
+  Select,
+  TableWrap,
+  Th,
+  Td,
+  Badge,
+  EmptyState,
+  Loading,
+} from "./ui";
 
 interface FlatSubmission {
   docId: string;
@@ -70,6 +85,24 @@ const TeacherSubmissions: React.FC = () => {
     );
   }, [flat, searchTerm, selectedDept]);
 
+  /*
+    NOTE: this divides by count * 100, but the grader scores each answer out of
+    10 (totalScore is 10), so "Scaled" comes out ten times lower than intended
+    and currently just mirrors "Avg". Left exactly as it was, because it decides
+    the marks students receive and that is not a change to make silently — see
+    the handover note. The correct denominator is the response's own totalScore.
+  */
+  const scoreFor = (s: FlatSubmission) => {
+    const total = s.responses.reduce(
+      (sum, r) => sum + (s.manualOverrides[r.QuestionsId] ?? r.score),
+      0
+    );
+    const count = s.responses.length;
+    const scaled = ((count ? total / (count * 100) : 0) * maxScore).toFixed(2);
+    const avg = count ? (total / count).toFixed(2) : "0.00";
+    return { total, count, scaled, avg };
+  };
+
   const saveOverrides = async (sub: FlatSubmission) => {
     try {
       const token = await GetToken();
@@ -95,15 +128,9 @@ const TeacherSubmissions: React.FC = () => {
   };
 
   const downloadCSV = () => {
-    const header = ["Name", "Matric", "Department", "Attempt", "Q’s", "Total", `Scaled(${maxScore})`, "Avg"];
+    const header = ["Name", "Matric", "Department", "Attempt", "Q's", "Total", `Scaled(${maxScore})`, "Avg"];
     const rows = displayed.map(s => {
-      const total = s.responses.reduce(
-        (sum, r) => sum + (s.manualOverrides[r.QuestionsId] ?? r.score),
-        0
-      );
-      const count = s.responses.length;
-      const scaled = ((count ? total / (count * 100) : 0) * maxScore).toFixed(2);
-      const avg = count ? (total / count).toFixed(2) : "0.00";
+      const { total, count, scaled, avg } = scoreFor(s);
       return [
         s.studentName,
         s.studentId,
@@ -125,107 +152,130 @@ const TeacherSubmissions: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  if (loading) return <div>Loading submissions…</div>;
-
   return (
-    <div className="p-4 space-y-6">
-      <h2 className="text-2xl font-bold">All Student Scores</h2>
+    <>
+      <PageHeader
+        title="Student Scores"
+        subtitle={`${flat.length} attempt${flat.length === 1 ? "" : "s"}${
+          displayed.length !== flat.length ? ` · ${displayed.length} shown` : ""
+        }`}
+        actions={
+          <Button variant="secondary" size="sm" onClick={downloadCSV}>
+            <Download className="h-4 w-4" />
+            Download CSV
+          </Button>
+        }
+      />
 
-      <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
-        <input
-          type="text"
-          className="border px-3 py-2 w-full sm:w-80"
-          placeholder="Search by name or matric"
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-        />
-        <select
-          className="border px-3 py-2 w-full sm:w-60"
-          value={selectedDept}
-          onChange={e => setSelectedDept(e.target.value)}
-        >
-          <option value="All">All Departments</option>
-          {departments.map(dept => (
-            <option key={dept} value={dept}>
-              {dept}
-            </option>
-          ))}
-        </select>
-        <input
-          type="number"
-          className="border px-3 py-2 w-full sm:w-40"
-          placeholder="Max Score"
-          value={maxScore}
-          onChange={e => setMaxScore(+e.target.value)}
-        />
-        <button
-          className="bg-green-600 text-white px-4 py-2 rounded"
-          onClick={downloadCSV}
-        >
-          Download CSV
-        </button>
-      </div>
-
-      <table className="min-w-full bg-white border mt-4">
-        <thead>
-          <tr className="bg-gray-100">
-            {["Name", "Matric", "Department", "Attempt", "Q’s", "Total", "Scaled", "Avg"].map(h => (
-              <th key={h} className="border p-2 text-left">
-                {h}
-              </th>
+      <Card>
+        <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center">
+          <Input
+            type="search"
+            className="sm:max-w-xs"
+            placeholder="Search by name or matric…"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+          <Select value={selectedDept} onChange={e => setSelectedDept(e.target.value)}>
+            <option value="All">All Departments</option>
+            {departments.map(dept => (
+              <option key={dept} value={dept}>
+                {dept}
+              </option>
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          {displayed.map(s => {
-            const total = s.responses.reduce(
-              (sum, r) => sum + (s.manualOverrides[r.QuestionsId] ?? r.score),
-              0
-            );
-            const count = s.responses.length;
-            const scaled = ((count ? total / (count * 100) : 0) * maxScore).toFixed(2);
-            const avg = count ? (total / count).toFixed(2) : "0.00";
-            return (
-              <tr
-                key={s.docId}
-                className="hover:bg-gray-50 cursor-pointer"
-                onClick={() => setSelected(s)}
-              >
-                <td className="border p-2 text-blue-600">{s.studentName}</td>
-                <td className="border p-2 text-blue-600">{s.studentId}</td>
-                <td className="border p-2">{s.department}</td>
-                <td className="border p-2">{s.attemptIndex + 1}</td>
-                <td className="border p-2">{count}</td>
-                <td className="border p-2">{total}</td>
-                <td className="border p-2">{scaled}</td>
-                <td className="border p-2">{avg}</td>
+          </Select>
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            Max score
+            <Input
+              type="number"
+              className="w-24"
+              value={maxScore}
+              onChange={e => setMaxScore(+e.target.value)}
+            />
+          </label>
+        </div>
+
+        {loading ? (
+          <Loading label="Loading submissions" />
+        ) : displayed.length === 0 ? (
+          <EmptyState
+            icon={<FileText className="h-10 w-10" />}
+            title={flat.length === 0 ? "No submissions yet" : "No matches"}
+            hint={
+              flat.length === 0
+                ? "Scores appear here once students have submitted."
+                : "Try a different name, matric number or department."
+            }
+          />
+        ) : (
+          <TableWrap maxHeight="calc(100vh - 22rem)">
+            <thead>
+              <tr>
+                <Th>Name</Th>
+                <Th>Matric</Th>
+                <Th>Department</Th>
+                <Th>Attempt</Th>
+                <Th>Q's</Th>
+                <Th>Total</Th>
+                <Th>Scaled</Th>
+                <Th>Avg</Th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {displayed.map(s => {
+                const { total, count, scaled, avg } = scoreFor(s);
+                return (
+                  <tr
+                    key={s.docId}
+                    className={`cursor-pointer transition-colors ${
+                      selected?.docId === s.docId ? "bg-navy-50/60" : "hover:bg-slate-50"
+                    }`}
+                    onClick={() => setSelected(s)}
+                  >
+                    <Td className="font-medium text-navy-900">{s.studentName}</Td>
+                    <Td className="font-mono text-xs">{s.studentId}</Td>
+                    <Td>
+                      <Badge tone="navy">{s.department || "—"}</Badge>
+                    </Td>
+                    <Td>{s.attemptIndex + 1}</Td>
+                    <Td>{count}</Td>
+                    <Td className="font-medium">{total}</Td>
+                    <Td>{scaled}</Td>
+                    <Td>{avg}</Td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </TableWrap>
+        )}
+      </Card>
 
       {selected && (
-        <div className="mt-8 p-4 border rounded bg-gray-50">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-semibold">
-              {selected.studentName} ({selected.studentId}) — Practicals {selected.attemptIndex + 1}
-            </h3>
-            <button
-              className="bg-gray-400 text-white px-4 py-2 rounded"
-              onClick={() => setSelected(null)}
-            >
-              Close
-            </button>
-          </div>
-          <table className="min-w-full bg-white border">
+        <Card className="mt-6">
+          <CardHeader
+            title={`${selected.studentName} · ${selected.studentId} · Attempt ${
+              selected.attemptIndex + 1
+            }`}
+            actions={
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => saveOverrides(selected)}>
+                  Save overrides
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setSelected(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            }
+          />
+          <TableWrap>
             <thead>
-              <tr className="bg-gray-100">
-                {["Question", "Code", "Output", "AI Grade", "Override", "Transfer"].map(h => (
-                  <th key={h} className="border p-2 text-left">
-                    {h}
-                  </th>
-                ))}
+              <tr>
+                <Th className="w-[24%]">Question</Th>
+                <Th className="w-[26%]">Code</Th>
+                <Th className="w-[22%]">Output</Th>
+                <Th>AI grade</Th>
+                <Th>Override</Th>
+                <Th></Th>
               </tr>
             </thead>
             <tbody>
@@ -233,21 +283,28 @@ const TeacherSubmissions: React.FC = () => {
                 const ai = r.score;
                 const over = selected.manualOverrides[r.QuestionsId] ?? ai;
                 return (
-                  <tr key={r.QuestionsId} className="border-t align-top">
-                    <td className="border p-2 max-w-xs whitespace-pre-wrap">{r.questionText}</td>
-                    <td className="border p-2 font-mono text-sm max-w-xs overflow-auto bg-gray-100">
-                      {r.code}
-                    </td>
-                    <td className="border p-2 font-mono text-sm max-w-xs overflow-auto bg-gray-100">
-                      {r.output}
-                    </td>
-                    <td className="border p-2">{ai}</td>
-                    <td className="border p-2">
-                      <input
+                  <tr key={r.QuestionsId} className="align-top">
+                    <Td className="whitespace-pre-wrap text-slate-700">{r.questionText}</Td>
+                    <Td>
+                      <pre className="max-h-40 overflow-auto rounded-lg bg-slate-900 p-3 font-mono text-xs text-slate-100">
+                        {r.code || "— no answer —"}
+                      </pre>
+                    </Td>
+                    <Td>
+                      <pre className="max-h-40 overflow-auto rounded-lg bg-slate-100 p-3 font-mono text-xs text-slate-700">
+                        {r.output || "—"}
+                      </pre>
+                    </Td>
+                    <Td>
+                      <Badge tone={ai > 0 ? "green" : "slate"}>{ai}</Badge>
+                    </Td>
+                    <Td>
+                      <Input
                         type="number"
                         min={0}
                         max={100}
                         value={over}
+                        className="w-20"
                         onChange={e =>
                           setSelected(prev =>
                             prev && {
@@ -259,12 +316,13 @@ const TeacherSubmissions: React.FC = () => {
                             }
                           )
                         }
-                        className="w-20 border px-1 py-0.5"
                       />
-                    </td>
-                    <td className="border p-2">
-                      <button
-                        className="bg-yellow-500 text-white px-2 py-1 rounded"
+                    </Td>
+                    <Td>
+                      <Button
+                        variant="gold"
+                        size="sm"
+                        title="Copy the AI grade into the override"
                         onClick={() =>
                           setSelected(prev =>
                             prev && {
@@ -278,24 +336,16 @@ const TeacherSubmissions: React.FC = () => {
                         }
                       >
                         Transfer
-                      </button>
-                    </td>
+                      </Button>
+                    </Td>
                   </tr>
                 );
               })}
             </tbody>
-          </table>
-          <div className="mt-4">
-            <button
-              className="bg-blue-600 text-white px-4 py-2 rounded"
-              onClick={() => saveOverrides(selected!)}
-            >
-              Save Overrides
-            </button>
-          </div>
-        </div>
+          </TableWrap>
+        </Card>
       )}
-    </div>
+    </>
   );
 };
 

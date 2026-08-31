@@ -1,12 +1,28 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaUpload, FaArrowLeft } from "react-icons/fa";
-import { CiSquareQuestion } from "react-icons/ci";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Papa from "papaparse";
 import axios from "axios";
+import { UploadCloud, FileCheck2, Check, Info } from "lucide-react";
 import { baseUrl, GetToken } from "../App";
+import {
+  Card,
+  CardHeader,
+  PageHeader,
+  Button,
+  Input,
+  TableWrap,
+  Th,
+  Td,
+  Badge,
+} from "./ui";
+
+const steps = [
+  { n: 1, label: "Students" },
+  { n: 2, label: "Questions" },
+  { n: 3, label: "Course details" },
+];
 
 const AdminUpload: React.FC = () => {
   const [step, setStep] = useState(1);
@@ -18,6 +34,8 @@ const AdminUpload: React.FC = () => {
   const [timer, setTimer] = useState("");
   const [MaxAnswerable, setMaxAnswerable] = useState<number>(0);
   const [showMaxInfo, setShowMaxInfo] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState({ done: 0, total: 0, failed: 0 });
 
   const navigate = useNavigate();
 
@@ -51,7 +69,7 @@ const AdminUpload: React.FC = () => {
                 });
                 setStudentsData(formattedStudents);
               } else {
-                let questionsArray: any = [];
+                const questionsArray: any = [];
                 results.data.forEach((question: any) => {
                   questionsArray.push({
                     questionId: question["Question ID"],
@@ -60,7 +78,7 @@ const AdminUpload: React.FC = () => {
                 });
                 setQuestionsData(questionsArray);
                 // Clamp MaxAnswerable if needed
-                setMaxAnswerable(prev =>
+                setMaxAnswerable((prev) =>
                   prev > questionsArray.length ? questionsArray.length : prev
                 );
               }
@@ -93,6 +111,7 @@ const AdminUpload: React.FC = () => {
         "Please upload and process both students and questions files!"
       );
     }
+    setSubmitting(true);
     try {
       const idToken = await GetToken();
       const existingResponse = await axios.get(`${baseUrl}/students`, {
@@ -103,17 +122,24 @@ const AdminUpload: React.FC = () => {
         existingStudents.map((s: any) => s.StudentId)
       );
 
-      for (const student of studentsData) {
-        if (existingStudentIds.has(student.StudentId)) {
-          continue;
-        }
+      const toCreate = studentsData.filter(
+        (s) => !existingStudentIds.has(s.StudentId)
+      );
+      setProgress({ done: 0, total: toCreate.length, failed: 0 });
+
+      // Sequential on purpose: a whole cohort fired at once is a burst the API
+      // has no reason to absorb. Failures are counted rather than swallowed, so
+      // a partial upload cannot look like a complete one.
+      let failed = 0;
+      for (let i = 0; i < toCreate.length; i++) {
         try {
-          await axios.post(`${baseUrl}/students`, student, {
+          await axios.post(`${baseUrl}/students`, toCreate[i], {
             headers: { Authorization: `Bearer ${idToken}` },
           });
         } catch {
-
+          failed++;
         }
+        setProgress({ done: i + 1, total: toCreate.length, failed });
       }
 
       const questions = {
@@ -131,315 +157,367 @@ const AdminUpload: React.FC = () => {
         },
       });
 
-      toast.success("Data uploaded successfully!");
+      const skipped = studentsData.length - toCreate.length;
+      if (failed > 0) {
+        toast.warn(
+          `Paper created. ${toCreate.length - failed} students added, ${failed} failed${
+            skipped ? `, ${skipped} already existed` : ""
+          }.`
+        );
+      } else {
+        toast.success(
+          `Uploaded. ${toCreate.length} students added${
+            skipped ? `, ${skipped} already existed` : ""
+          }.`
+        );
+      }
       navigate("/AdminDashboard");
     } catch {
       toast.error("Error uploading data.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const totalQuestions = questionsData.length;
 
+  const DropZone: React.FC<{
+    id: string;
+    file: File | null;
+    rows: number;
+    label: string;
+    type: string;
+  }> = ({ id, file, rows, label, type }) => (
+    <>
+      <button
+        onClick={() => document.getElementById(id)?.click()}
+        className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2
+          border-dashed border-slate-300 bg-slate-50 px-6 py-10 transition-colors
+          hover:border-navy-400 hover:bg-navy-50/40"
+      >
+        {file ? (
+          <FileCheck2 className="h-8 w-8 text-emerald-600" />
+        ) : (
+          <UploadCloud className="h-8 w-8 text-slate-400" />
+        )}
+        <span className="text-sm font-medium text-navy-900">
+          {file ? file.name : label}
+        </span>
+        <span className="text-xs text-slate-500">
+          {file ? `${rows} row${rows === 1 ? "" : "s"} parsed · click to replace` : "CSV files only"}
+        </span>
+      </button>
+      <input
+        type="file"
+        id={id}
+        accept=".csv"
+        className="hidden"
+        onChange={(e) => handleFileChange(e, type)}
+      />
+    </>
+  );
+
   return (
-    <div className="max-h-screen flex flex-col items-center justify-center bg-white">
-      <div className="absolute top-4 left-4">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
-        >
-          <FaArrowLeft />
-          <span>Back</span>
-        </button>
-      </div>
+    <>
+      <PageHeader
+        title="Upload"
+        subtitle="Load a student roster and a question paper."
+      />
 
-      <div className="w-full bg-blue-600 py-4 text-center text-white text-xl font-bold">
-        Admin Upload
-      </div>
+      {/* Stepper */}
+      <ol className="mb-6 flex items-center gap-2">
+        {steps.map((s, i) => (
+          <li key={s.n} className="flex flex-1 items-center gap-2">
+            <span
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                step > s.n
+                  ? "bg-emerald-600 text-white"
+                  : step === s.n
+                  ? "bg-navy-700 text-white"
+                  : "bg-slate-200 text-slate-500"
+              }`}
+            >
+              {step > s.n ? <Check className="h-4 w-4" /> : s.n}
+            </span>
+            <span
+              className={`hidden text-sm sm:block ${
+                step >= s.n ? "font-medium text-navy-900" : "text-slate-400"
+              }`}
+            >
+              {s.label}
+            </span>
+            {i < steps.length - 1 && (
+              <span
+                className={`h-px flex-1 ${step > s.n ? "bg-emerald-600" : "bg-slate-200"}`}
+              />
+            )}
+          </li>
+        ))}
+      </ol>
 
-      <div className="w-full max-w-md p-8 bg-blue-50 rounded-lg shadow-md mt-10">
-        {/* Step 1: Students Upload */}
+      <Card>
         {step === 1 && (
           <>
-            <p className="mb-2 text-sm font-semibold">
-              Step 1: Upload Students CSV
-            </p>
-            {/* Show expected format */}
-            <details className="mb-4">
-              <summary className="cursor-pointer text-blue-600">
-                View required student CSV format
-              </summary>
-              <div className="mt-2 overflow-x-auto bg-white border p-2 rounded">
-                <p className="text-xs text-gray-600 mb-1">
-                  Required headers (case-sensitive):<br/>
-                  <code>Names,MatricNo,Department,Password</code><br/>
-                  <strong>Names</strong>: full name, e.g. "Nuel John".<br/>
-                  <strong>MatricNo</strong>: student ID.<br/>
-                  <strong>Department</strong>: e.g. "Computer Science".<br/>
-                  {/* - <strong>Password</strong>(or blank).<br/> */}
-                </p>
-                <table className="w-full text-xs border border-gray-300">
-                  <thead>
-                    <tr className="bg-gray-200">
-                      <th className="border p-1">Names</th>
-                      <th className="border p-1">MatricNo</th>
-                      <th className="border p-1">Department</th>
-                      {/* <th className="border p-1">Password</th> */}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="border p-1">Doe John</td>
-                      <td className="border p-1">CS12345</td>
-                      <td className="border p-1">Computer Science</td>
-                      {/* <td className="border p-1">pass123</td> */}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </details>
-
-            <button
-              onClick={() => document.getElementById("studentsFile")?.click()}
-              className="w-full mb-4 p-2 bg-green-600 text-white rounded-md hover:bg-green-700 cursor-pointer flex items-center justify-center"
-            >
-              Upload Students CSV <FaUpload className="ml-2" />
-            </button>
-            <input
-              type="file"
-              id="studentsFile"
-              accept=".csv"
-              className="hidden"
-              onChange={(e) => handleFileChange(e, "students")}
+            <CardHeader
+              title="Step 1 · Students CSV"
+              actions={studentsData.length > 0 && <Badge tone="green">{studentsData.length} rows</Badge>}
             />
-            {studentsFile && (
-              <p className="text-sm text-gray-700">{studentsFile.name}</p>
-            )}
-            {studentsData.length > 0 && (
-              <div className="mt-4 overflow-x-auto">
-                <p className="text-sm font-semibold">Preview (first row):</p>
-                <table className="w-full border border-gray-300 text-sm">
-                  <thead>
-                    <tr className="bg-gray-200">
-                      {Object.keys(studentsData[0]).map((key) => (
-                        <th key={key} className="border p-2">
-                          {key}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {studentsData.slice(0, 1).map((row, index) => (
-                      <tr key={index} className="border">
-                        {Object.values(row).map((value, idx) => (
-                          <td key={idx} className="border p-2">
-                            {value as string}
-                          </td>
-                        ))}
+            <div className="space-y-4 p-5">
+              <details className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <summary className="cursor-pointer text-sm font-medium text-navy-700">
+                  Required CSV format
+                </summary>
+                <p className="mt-2 text-xs text-slate-600">
+                  Headers are case-sensitive: <code className="rounded bg-white px-1 py-0.5">Names,MatricNo,Department,Password</code>
+                  . <strong>Names</strong> is the full name (e.g. "Doe John"); the first
+                  word is taken as the surname.
+                </p>
+                <div className="mt-2 overflow-x-auto rounded border border-slate-200 bg-white">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr>
+                        <Th>Names</Th>
+                        <Th>MatricNo</Th>
+                        <Th>Department</Th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <Td>Doe John</Td>
+                        <Td>CS12345</Td>
+                        <Td>Computer Science</Td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+
+              <DropZone
+                id="studentsFile"
+                file={studentsFile}
+                rows={studentsData.length}
+                label="Upload students CSV"
+                type="students"
+              />
+
+              {studentsData.length > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Preview · first row
+                  </p>
+                  <div className="overflow-hidden rounded-lg border border-slate-200">
+                    <TableWrap>
+                      <thead>
+                        <tr>
+                          {Object.keys(studentsData[0]).map((key) => (
+                            <Th key={key}>{key}</Th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {studentsData.slice(0, 1).map((row, index) => (
+                          <tr key={index}>
+                            {Object.values(row).map((value, idx) => (
+                              <Td key={idx}>{value as string}</Td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </TableWrap>
+                  </div>
+                </div>
+              )}
+            </div>
           </>
         )}
 
-        {/* Step 2: Questions Upload */}
         {step === 2 && (
           <>
-            <p className="mb-2 text-sm font-semibold">
-              Step 2: Upload Questions CSV
-            </p>
-            {/* Show expected format */}
-            <details className="mb-4">
-              <summary className="cursor-pointer text-blue-600">
-                View required questions CSV format
-              </summary>
-              <div className="mt-2 overflow-x-auto bg-white border p-2 rounded text-xs">
-                <p className="text-gray-600 mb-1">
-                  Required headers (case-sensitive):<br/>
-                  <code>Question ID,Question</code><br/>
-                  - <strong>Question ID</strong>: unique identifier.<br/>
-                  - <strong>Question</strong>: question text.<br/>
-                </p>
-                <table className="w-full border border-gray-300">
-                  <thead>
-                    <tr className="bg-gray-200">
-                      <th className="border p-1">Question ID</th>
-                      <th className="border p-1">Question</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="border p-1">Q1</td>
-                      <td className="border p-1">Explain OOP concepts.</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </details>
-
-            <button
-              onClick={() => document.getElementById("questionsFile")?.click()}
-              className="w-full mb-4 p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer flex items-center justify-center"
-            >
-              Upload Questions CSV File <FaUpload className="ml-2" />
-            </button>
-            <input
-              type="file"
-              id="questionsFile"
-              accept=".csv"
-              className="hidden"
-              onChange={(e) => handleFileChange(e, "questions")}
+            <CardHeader
+              title="Step 2 · Questions CSV"
+              actions={questionsData.length > 0 && <Badge tone="green">{questionsData.length} questions</Badge>}
             />
-            {questionsFile && (
-              <p className="text-sm text-gray-700">{questionsFile.name}</p>
-            )}
-            {questionsData.length > 0 && (
-              <div className="mt-4 overflow-x-auto">
-                <p className="text-sm font-semibold">Preview (first row):</p>
-                <table className="w-full border border-gray-300 text-sm">
-                  <thead>
-                    <tr className="bg-gray-200">
-                      <th className="border p-2">Question ID</th>
-                      <th className="border p-2">Question</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {questionsData.slice(0, 1).map((q, idx) => (
-                      <tr key={idx}>
-                        <td className="border p-2">{q.questionId}</td>
-                        <td className="border p-2">{q.questionText}</td>
+            <div className="space-y-4 p-5">
+              <details className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <summary className="cursor-pointer text-sm font-medium text-navy-700">
+                  Required CSV format
+                </summary>
+                <p className="mt-2 text-xs text-slate-600">
+                  Headers are case-sensitive:{" "}
+                  <code className="rounded bg-white px-1 py-0.5">Question ID,Question</code>
+                </p>
+                <div className="mt-2 overflow-x-auto rounded border border-slate-200 bg-white">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr>
+                        <Th>Question ID</Th>
+                        <Th>Question</Th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <Td>Q1</Td>
+                        <Td>Explain OOP concepts.</Td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+
+              <DropZone
+                id="questionsFile"
+                file={questionsFile}
+                rows={questionsData.length}
+                label="Upload questions CSV"
+                type="questions"
+              />
+
+              {questionsData.length > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Preview · first row
+                  </p>
+                  <div className="overflow-hidden rounded-lg border border-slate-200">
+                    <TableWrap>
+                      <thead>
+                        <tr>
+                          <Th>Question ID</Th>
+                          <Th>Question</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {questionsData.slice(0, 1).map((q, idx) => (
+                          <tr key={idx}>
+                            <Td>{q.questionId}</Td>
+                            <Td>{q.questionText}</Td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </TableWrap>
+                  </div>
+                </div>
+              )}
+            </div>
           </>
         )}
 
-        {/* Step 3: Course Details and Maximum Questions */}
         {step === 3 && (
           <>
-            <p className="mb-2 text-sm font-semibold">
-              Step 3: Enter Course Details
-            </p>
-            <label className="block text-sm font-medium text-gray-700">
-              Course Title
-            </label>
-            <input
-              type="text"
-              className="w-full border rounded-md p-2 mt-2"
-              placeholder="Enter course title"
-              value={courseTitle}
-              onChange={(e) => setCourseTitle(e.target.value)}
-            />
-            <label className="block text-sm font-medium text-gray-700 mt-4">
-              Set Duration (in minutes)
-            </label>
-            <input
-              type="number"
-              className="w-full border rounded-md p-2 mt-2"
-              value={timer}
-              onChange={(e) => setTimer(e.target.value)}
-            />
-
-            {/* Maximum Questions Field */}
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700">
-                Max Answerable Questions
-                <sup>
-                  <div className="relative inline-block">
-                    <CiSquareQuestion
-                      className="inline text-blue-600 cursor-pointer text-2xl"
-                      onClick={() => setShowMaxInfo(!showMaxInfo)}
-                    />
-                    {showMaxInfo && (
-                      <div
-                        className="absolute z-10 top-[-5px] left-[40px] p-2 border rounded bg-white shadow text-xs"
-                        onClick={() => setShowMaxInfo(false)}
-                      >
-                        <p>
-                          This is the number of questions made available per
-                          student. Choose{" "}
-                          <span className="text-green-600">"MAX"</span> to use
-                          all uploaded questions.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </sup>
-              </label>
-              <div className="flex items-center space-x-2 mt-2">
-                <input
-                  type="number"
-                  className="w-24 border rounded-md p-2"
-                  value={MaxAnswerable}
-                  min={0}
-                  max={totalQuestions}
-                  onChange={(e) => {
-                    let val = parseInt(e.target.value, 10);
-                    if (isNaN(val) || val < 0) val = 0;
-                    if (val > totalQuestions) val = totalQuestions;
-                    setMaxAnswerable(val);
-                  }}
-                />
-                <span
-                  onClick={() => {
-                    if (MaxAnswerable !== totalQuestions) {
-                      setMaxAnswerable(totalQuestions);
-                    }
-                  }}
-                  className={
-                    "ml-1 " +
-                    (MaxAnswerable === totalQuestions
-                      ? "text-gray-400 cursor-not-allowed select-none"
-                      : "text-green-600 cursor-pointer")
-                  }
-                  title={
-                    MaxAnswerable === totalQuestions
-                      ? "Already at MAX"
-                      : "Set to total questions"
-                  }
-                >
-                  MAX
+            <CardHeader title="Step 3 · Course details" />
+            <div className="grid gap-5 p-5 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Course title
                 </span>
-                <span className="text-sm text-gray-500">/ {totalQuestions}</span>
+                <Input
+                  type="text"
+                  placeholder="e.g. Introduction to Programming"
+                  value={courseTitle}
+                  onChange={(e) => setCourseTitle(e.target.value)}
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Duration (minutes)
+                </span>
+                <Input
+                  type="number"
+                  value={timer}
+                  onChange={(e) => setTimer(e.target.value)}
+                />
+              </label>
+
+              <div className="sm:col-span-2">
+                <div className="mb-1.5 flex items-center gap-1.5">
+                  <span className="text-sm font-medium text-slate-700">
+                    Max answerable questions
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowMaxInfo(!showMaxInfo)}
+                    className="text-slate-400 hover:text-navy-700"
+                    aria-label="What is this?"
+                  >
+                    <Info className="h-4 w-4" />
+                  </button>
+                </div>
+                {showMaxInfo && (
+                  <p className="mb-2 rounded-lg border border-navy-100 bg-navy-50 p-3 text-xs text-navy-800">
+                    How many questions each student is given, drawn at random from the
+                    uploaded set. Use <strong>MAX</strong> to give every student all of
+                    them.
+                  </p>
+                )}
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    className="w-28"
+                    value={MaxAnswerable}
+                    min={0}
+                    max={totalQuestions}
+                    onChange={(e) => {
+                      let val = parseInt(e.target.value, 10);
+                      if (isNaN(val) || val < 0) val = 0;
+                      if (val > totalQuestions) val = totalQuestions;
+                      setMaxAnswerable(val);
+                    }}
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={MaxAnswerable === totalQuestions}
+                    onClick={() => setMaxAnswerable(totalQuestions)}
+                  >
+                    MAX
+                  </Button>
+                  <span className="text-sm text-slate-500">of {totalQuestions}</span>
+                </div>
               </div>
             </div>
           </>
         )}
 
-        {/* Navigation Buttons */}
-        <div className="flex justify-between mt-6">
-          {step > 1 && (
-            <button
-              onClick={handlePrevious}
-              className="px-4 py-2 bg-gray-400 text-white rounded-md"
-            >
-              Previous
-            </button>
-          )}
+        {/* Upload progress — a 140-student roster is posted one at a time. */}
+        {submitting && progress.total > 0 && (
+          <div className="border-t border-slate-200 px-5 py-4">
+            <div className="mb-2 flex justify-between text-xs text-slate-600">
+              <span>
+                Adding students… {progress.done} of {progress.total}
+                {progress.failed > 0 && (
+                  <span className="text-red-600"> · {progress.failed} failed</span>
+                )}
+              </span>
+              <span>{Math.round((progress.done / progress.total) * 100)}%</span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full rounded-full bg-navy-700 transition-all"
+                style={{ width: `${(progress.done / progress.total) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-4">
+          <Button
+            variant="secondary"
+            onClick={handlePrevious}
+            disabled={step === 1 || submitting}
+          >
+            Previous
+          </Button>
           {step < 3 ? (
-            <button
-              onClick={handleNext}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md"
-            >
-              Next
-            </button>
+            <Button onClick={handleNext}>Next</Button>
           ) : (
-            <button
-              onClick={handleSubmit}
-              className="px-4 py-2 bg-green-600 text-white rounded-md"
-            >
-              Submit
-            </button>
+            <Button onClick={handleSubmit} disabled={submitting}>
+              {submitting ? "Uploading…" : "Create paper & upload students"}
+            </Button>
           )}
         </div>
-      </div>
+      </Card>
       <ToastContainer />
-    </div>
+    </>
   );
 };
 

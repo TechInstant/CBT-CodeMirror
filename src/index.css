@@ -3,6 +3,37 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+  Brand palette, sampled from the OAU crest in public/oau.png rather than chosen:
+  the shield is #000080 and the ribbon and lettering are #FFD040. Those two are
+  the anchors (navy-700, gold-400); the rest of each ramp is built around them so
+  there is enough range for surfaces, borders, hover and text without drifting
+  off-brand.
+*/
+@theme {
+  --color-navy-50: #eef1fb;
+  --color-navy-100: #dce1f6;
+  --color-navy-200: #b9c3ed;
+  --color-navy-300: #8e9ce0;
+  --color-navy-400: #5c6dd0;
+  --color-navy-500: #3341bc;
+  --color-navy-600: #1a22a0;
+  --color-navy-700: #000080;
+  --color-navy-800: #000066;
+  --color-navy-900: #00004d;
+  --color-navy-950: #000033;
+
+  --color-gold-50: #fffaeb;
+  --color-gold-100: #fff2c7;
+  --color-gold-200: #ffe58a;
+  --color-gold-300: #ffda5e;
+  --color-gold-400: #ffd040;
+  --color-gold-500: #f5be1a;
+  --color-gold-600: #d19a0b;
+  --color-gold-700: #a6760c;
+  --color-gold-800: #7a5610;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
