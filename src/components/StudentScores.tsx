@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
-import { Download, X, FileText, RotateCcw } from "lucide-react";
+import { Download, X, FileText, RotateCcw, ClipboardCheck } from "lucide-react";
+import ReviewPanel from "./ReviewPanel";
 import {
   useSubmissions,
   QuestionResponse,
@@ -35,6 +36,8 @@ interface FlatSubmission {
   manualOverrides: Record<string, number>;
   gradingStatus?: GradingStatus;
   paperId?: string;
+  blindReview?: boolean;
+  review?: { instructorId: string; openedAt: string; submittedAt?: string };
 }
 
 const TeacherSubmissions: React.FC = () => {
@@ -47,6 +50,7 @@ const TeacherSubmissions: React.FC = () => {
   const [selected, setSelected] = useState<FlatSubmission | null>(null);
   const [resetting, setResetting] = useState<string | null>(null);
   const [confirmResit, setConfirmResit] = useState<FlatSubmission | null>(null);
+  const [reviewing, setReviewing] = useState<FlatSubmission | null>(null);
 
   // Build flat list whenever submissions change
   useEffect(() => {
@@ -64,6 +68,8 @@ const TeacherSubmissions: React.FC = () => {
           manualOverrides: att.manualOverrides || {},
           gradingStatus: att.gradingStatus,
           paperId: att.paperId,
+          blindReview: att.blindReview,
+          review: att.review,
         });
       })
     );
@@ -287,6 +293,7 @@ const TeacherSubmissions: React.FC = () => {
                 <Th>Total</Th>
                 <Th>Scaled</Th>
                 <Th>Avg</Th>
+                <Th>Review</Th>
               </tr>
             </thead>
             <tbody>
@@ -324,6 +331,17 @@ const TeacherSubmissions: React.FC = () => {
                         <Td>{avg}</Td>
                       </>
                     )}
+                    <Td>
+                      {s.review?.submittedAt ? (
+                        <Badge tone="green">
+                          Reviewed{s.blindReview ? " (blind)" : ""}
+                        </Badge>
+                      ) : s.blindReview ? (
+                        <Badge tone="navy">Blind</Badge>
+                      ) : (
+                        <Badge tone="slate">Sighted</Badge>
+                      )}
+                    </Td>
                   </tr>
                 );
               })}
@@ -331,6 +349,16 @@ const TeacherSubmissions: React.FC = () => {
           </TableWrap>
         )}
       </Card>
+
+      {reviewing && reviewing.paperId && (
+        <ReviewPanel
+          studentId={reviewing.docId.replace(/_\d+$/, "")}
+          paperId={reviewing.paperId}
+          studentName={`${reviewing.studentName} · ${reviewing.studentId}`}
+          onClose={() => setReviewing(null)}
+          onSaved={refresh}
+        />
+      )}
 
       {selected && (
         <Card className="mt-6">
@@ -340,6 +368,18 @@ const TeacherSubmissions: React.FC = () => {
             }`}
             actions={
               <div className="flex gap-2">
+                {/* Opening review starts the measured clock, so it is a
+                    deliberate action rather than a side effect of browsing. */}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => { setReviewing(selected); setSelected(null); }}
+                  disabled={!selected.paperId}
+                  title={selected.paperId ? "Mark this attempt" : "Attempt predates paper tracking"}
+                >
+                  <ClipboardCheck className="h-3.5 w-3.5" />
+                  Review
+                </Button>
                 <Button size="sm" onClick={() => saveOverrides(selected)}>
                   Save overrides
                 </Button>

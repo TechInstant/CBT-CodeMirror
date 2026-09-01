@@ -30,6 +30,15 @@ export interface Attempt {
   paperId?: string;
   gradingStatus?: GradingStatus;
   gradingError?: string;
+  // Allocated at submission time, before anyone sees the work.
+  blindReview?: boolean;
+  review?: {
+    instructorId: string;
+    blind: boolean;
+    aiScoreVisibleAtReview: boolean;
+    openedAt: string;
+    submittedAt?: string;
+  };
 }
 
 export interface SubmissionDocument {
