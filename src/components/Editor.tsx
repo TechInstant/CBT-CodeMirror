@@ -9,7 +9,7 @@ import { material } from "@uiw/codemirror-theme-material";
 import { dracula } from "@uiw/codemirror-theme-dracula";
 import { formatString } from "../components/FormatString";
 import { StudentQuestion, useQuestions } from "../Context/QuestionContext";
-import { FaSpinner } from "react-icons/fa";
+import { FaSpinner, FaExclamationTriangle } from "react-icons/fa";
 import { baseUrl, GetToken } from "../App";
 import axios from "axios";
 // import { loadPyodide } from "pyodide";
@@ -392,7 +392,16 @@ useEffect(() => {
 }, []);
 
 
-  const [hasSubmitted, setHasSubmitted] = useState(false);
+  /*
+    Submission is a visible state machine, not a silent ref. The request can take
+    the best part of a minute when the API has gone to sleep, and previously the
+    button still read "Submit" the whole time while further clicks were swallowed
+    by the guard — indistinguishable from the page having frozen.
+  */
+  type SubmitState = "idle" | "submitting" | "done" | "blocked" | "failed";
+  const [submitState, setSubmitState] = useState<SubmitState>("idle");
+  const [submitError, setSubmitError] = useState("");
+  const hasSubmitted = submitState === "done";
   // The button, the timer and the tab-switch handler can all fire; only one may win.
   const submittingRef = useRef(false);
 
@@ -422,6 +431,8 @@ useEffect(() => {
     }
 
     submittingRef.current = true;
+    setSubmitState("submitting");
+    setSubmitError("");
 
     const codeMap = { ...questionCodeMap, [questionId]: code };
     const outMap  = { ...questionOutputMap, [questionId]: consoleOutput };
@@ -476,11 +487,14 @@ useEffect(() => {
             Authorization: `Bearer ${idToken}`,
             "Content-Type": "application/json",
           },
+          // A hung request must eventually surface rather than leaving the
+          // student staring at a button forever.
+          timeout: 90_000,
         }
       );
 
       toast.success("Submitted successfully!", { autoClose: 2000 });
-      setHasSubmitted(true);
+      setSubmitState("done");
 
       [
         "examEndsAt",
@@ -498,19 +512,25 @@ useEffect(() => {
 
       if (err.response) {
         const { status, data } = err.response;
-        if (status === 429 && data.redirect) {
-          toast.error(data.message, { autoClose: 2000 });
-          setTimeout(() => {
-            window.location.href = data.redirect;
-          }, 2000);
+
+        // Already sat this paper. Say so plainly and stop, rather than leaving
+        // them retrying a button that will never succeed.
+        if (status === 429) {
+          setSubmitState("blocked");
           return;
         }
 
-        // console.error("Submission failed:", data);
-        toast.error("Submission error: " + (data.message || err.response.statusText));
+        setSubmitState("failed");
+        setSubmitError(
+          data?.message || err.response.statusText || `Request failed (${status})`
+        );
       } else {
-        // console.error("Network error while submitting:", err);
-        toast.error("Network error—please try again.");
+        setSubmitState("failed");
+        setSubmitError(
+          err.code === "ECONNABORTED"
+            ? "The server did not respond in time. Your work is safe — please try again."
+            : "Could not reach the server. Check your connection and try again."
+        );
       }
     }
   }
@@ -554,6 +574,37 @@ useEffect(() => {
     const saved = qid === questionId ? code : questionCodeMap[qid];
     return !!saved && saved.trim() !== "" && !isStarter(saved);
   };
+
+  // Already submitted this paper. A toast was too easy to miss, and the editor
+  // behind it looked usable when it was not.
+  if (submitState === "blocked") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-gold-50 text-gold-600">
+            <FaExclamationTriangle size={24} />
+          </div>
+          <h1 className="mb-2 text-xl font-semibold text-navy-900">
+            You have already sat this paper
+          </h1>
+          <p className="mb-6 text-sm leading-relaxed text-slate-600">
+            Your earlier submission was recorded and is being graded. Only one
+            attempt per paper is accepted, so this one was not saved. Speak to
+            your invigilator if you believe this is wrong.
+          </p>
+          <button
+            onClick={() => {
+              localStorage.removeItem("userData");
+              window.location.href = "/";
+            }}
+            className="w-full rounded-lg bg-navy-700 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
+          >
+            Back to login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen flex-col bg-slate-100">
@@ -722,11 +773,30 @@ useEffect(() => {
         </div>
       </div>
 
+      {/* Submitting can take a while on a cold server; make it unmistakable. */}
+      {submitState === "submitting" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/50 p-4">
+          <div className="flex w-full max-w-xs flex-col items-center gap-3 rounded-xl bg-white p-6 text-center">
+            <FaSpinner className="animate-spin text-2xl text-navy-700" />
+            <p className="text-sm font-medium text-navy-900">Submitting your work…</p>
+            <p className="text-xs text-slate-500">
+              This can take up to a minute. Do not close this tab.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* footer */}
-      <footer className="flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3">
-        <p className="hidden text-xs text-slate-500 sm:block">
-          Copy and paste are disabled. Leaving this tab submits your work.
-        </p>
+      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3">
+        {submitState === "failed" ? (
+          <p className="text-xs font-medium text-red-600">
+            {submitError} Your answers are still here — press Submit again.
+          </p>
+        ) : (
+          <p className="hidden text-xs text-slate-500 sm:block">
+            Copy and paste are disabled. Leaving this tab submits your work.
+          </p>
+        )}
         <div className="ml-auto flex gap-2">
           {/* JavaScript runs in the browser directly, so it does not wait on the
               Python runtime downloading. */}
@@ -739,14 +809,21 @@ useEffect(() => {
           </button>
           <button
             onClick={() => handleSubmit("manual")}
-            disabled={hasSubmitted}
-            className={`rounded-lg px-5 py-2 text-sm font-semibold text-white transition-colors ${
-              hasSubmitted
+            disabled={submitState === "submitting" || hasSubmitted}
+            className={`inline-flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold text-white transition-colors ${
+              submitState === "submitting" || hasSubmitted
                 ? "cursor-not-allowed bg-slate-400"
                 : "bg-navy-700 hover:bg-navy-800"
             }`}
           >
-            {hasSubmitted ? "Submitted" : "Submit"}
+            {submitState === "submitting" && (
+              <FaSpinner className="animate-spin" />
+            )}
+            {submitState === "submitting"
+              ? "Submitting…"
+              : hasSubmitted
+              ? "Submitted"
+              : "Submit"}
           </button>
         </div>
       </footer>

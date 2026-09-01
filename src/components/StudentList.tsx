@@ -1,8 +1,9 @@
 import React, { useState, useContext } from "react";
 import axios from "axios";
 import { CSVLink } from "react-csv";
+import Papa from "papaparse";
 import { toast } from "react-toastify";
-import { Download, Pencil, Trash2, Check, X, Users, UserPlus } from "lucide-react";
+import { Download, Pencil, Trash2, Check, X, Users, UserPlus, Upload } from "lucide-react";
 import { baseUrl, GetToken } from "../App";
 import { StudentsContext, Student } from "../Context/StudentContext";
 import {
@@ -30,6 +31,7 @@ const StudentList: React.FC = () => {
   const [editFormData, setEditFormData] = useState<Partial<Student>>({});
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [importing, setImporting] = useState<{ done: number; total: number; failed: number } | null>(null);
   const [adding, setAdding] = useState(false);
   const [newStudent, setNewStudent] = useState({
     StudentId: "",
@@ -137,6 +139,79 @@ const StudentList: React.FC = () => {
     }
   };
 
+  /*
+    Bulk import straight into the roster. The upload wizard only ever imported
+    students as a side effect of creating a paper, so topping up a roster between
+    sittings meant creating a throwaway exam.
+  */
+  const handleCsvImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = ({ target }) => {
+      if (!target?.result) return;
+      Papa.parse(target.result as string, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async (results) => {
+          const rows = (results.data as any[]).map((r) => {
+            const names = r.Names ? String(r.Names).split(" ") : ["", ""];
+            return {
+              StudentId: r.MatricNo || "",
+              FirstName: names[1] || " ",
+              LastName: names[0] || " ",
+              Department: r.Department || " ",
+              Password: r.Password || names[0] || " ",
+              Role: "Student",
+              Email: r.Email || " ",
+            };
+          });
+
+          const existing = new Set(students.map((s) => s.StudentId));
+          const toCreate = rows.filter((r) => r.StudentId && !existing.has(r.StudentId));
+
+          if (toCreate.length === 0) {
+            toast.info("Nothing to import — every student in that file is already listed.");
+            return;
+          }
+
+          setImporting({ done: 0, total: toCreate.length, failed: 0 });
+          const idToken = await GetToken();
+          let failed = 0;
+          const added: Student[] = [];
+
+          for (let i = 0; i < toCreate.length; i++) {
+            try {
+              await axios.post(`${baseUrl}/students`, toCreate[i], {
+                headers: { Authorization: `Bearer ${idToken}` },
+              });
+              added.push({ ...toCreate[i], Scores: 0 } as unknown as Student);
+            } catch {
+              failed++;
+            }
+            setImporting({ done: i + 1, total: toCreate.length, failed });
+          }
+
+          setStudents((prev) => [...prev, ...added]);
+          setImporting(null);
+          const skipped = rows.length - toCreate.length;
+          if (failed) {
+            toast.warn(
+              `${added.length} added, ${failed} failed${skipped ? `, ${skipped} already listed` : ""}.`
+            );
+          } else {
+            toast.success(
+              `${added.length} students added${skipped ? `, ${skipped} already listed` : ""}.`
+            );
+          }
+        },
+      });
+    };
+    reader.readAsText(file);
+    e.target.value = ""; // allow re-importing the same file
+  };
+
   const handleDelete = async (studentId: string) => {
     try {
       const idToken = await GetToken();
@@ -171,6 +246,24 @@ const StudentList: React.FC = () => {
               <UserPlus className="h-4 w-4" />
               Add student
             </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!!importing}
+              onClick={() => document.getElementById("studentCsvImport")?.click()}
+            >
+              <Upload className="h-4 w-4" />
+              {importing
+                ? `Importing ${importing.done}/${importing.total}…`
+                : "Import CSV"}
+            </Button>
+            <input
+              id="studentCsvImport"
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={handleCsvImport}
+            />
             <CSVLink data={students} filename="students_results.csv">
               <Button variant="secondary" size="sm">
                 <Download className="h-4 w-4" />
