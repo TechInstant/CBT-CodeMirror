@@ -20,7 +20,9 @@ interface AttemptTelemetry {
   durationSeconds: number;
   runCounts: Record<string, number>;
   tabSwitchCount: number;
-  blockedClipboardCount: number;
+  // Clipboard use is allowed. Counted so the analysis can see how much pasting
+  // occurred, rather than inferring it from a restriction that no longer exists.
+  clipboardCounts: { copy: number; cut: number; paste: number };
   submitReason: "manual" | "timer" | "tab-switch";
   userAgent: string;
 }
@@ -66,13 +68,20 @@ function ensurePyodideScript(): Promise<void> {
   });
 }
 
-// Clipboard stays blocked; the difference is that the block is now counted, so an
-// invigilator can see how often it happened instead of only trusting that it did.
-const blockClipboard = (onBlocked: () => void) =>
+/*
+  Clipboard use is allowed, so students can copy the question text into their
+  answer and paste code they are drafting.
+
+  Every event is still counted. The restriction being lifted is exactly why the
+  measurement matters: an invigilator, and later the analysis, can see how much
+  pasting happened per attempt rather than assuming it did not. Counting without
+  blocking keeps the behaviour observable instead of merely forbidden.
+*/
+const countClipboard = (onClipboard: (kind: "copy" | "cut" | "paste") => void) =>
   EditorView.domEventHandlers({
-    copy: (e) => { e.preventDefault(); onBlocked(); return true; },
-    cut:  (e) => { e.preventDefault(); onBlocked(); return true; },
-    paste:(e) => { e.preventDefault(); onBlocked(); return true; }
+    copy: () => { onClipboard("copy"); return false; },
+    cut: () => { onClipboard("cut"); return false; },
+    paste: () => { onClipboard("paste"); return false; },
   });
 
 const STARTER_CODE: Record<string, string> = {
@@ -97,14 +106,15 @@ const Editor: React.FC = () => {
   );
   const runCountsRef = useRef<Record<string, number>>({});
   const tabSwitchCountRef = useRef(0);
-  const blockedClipboardRef = useRef(0);
+  // Clipboard use is permitted; these record it rather than prevent it.
+  const clipboardCountsRef = useRef({ copy: 0, cut: 0, paste: 0 });
 
   useEffect(() => {
     localStorage.setItem("examStartedAt", startedAtRef.current);
   }, []);
 
   const clipboardGuard = useRef(
-    blockClipboard(() => { blockedClipboardRef.current += 1; })
+    countClipboard((kind) => { clipboardCountsRef.current[kind] += 1; })
   ).current;
 
   useEffect(() => {
@@ -471,7 +481,7 @@ useEffect(() => {
         ),
         runCounts: runCountsRef.current,
         tabSwitchCount: tabSwitchCountRef.current,
-        blockedClipboardCount: blockedClipboardRef.current,
+        clipboardCounts: { ...clipboardCountsRef.current },
         submitReason: reason,
         userAgent: navigator.userAgent,
       },
@@ -794,7 +804,8 @@ useEffect(() => {
           </p>
         ) : (
           <p className="hidden text-xs text-slate-500 sm:block">
-            Copy and paste are disabled. Leaving this tab submits your work.
+            Leaving this tab submits your work. The timer keeps running if you
+            close or reload the page.
           </p>
         )}
         <div className="ml-auto flex gap-2">
