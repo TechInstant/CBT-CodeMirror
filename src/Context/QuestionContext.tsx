@@ -119,9 +119,18 @@ export const QuestionsProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   }, [questions]);
 
+  /*
+    activeQuestionsId is only written once a paper has been assigned, so on a
+    fresh browser this used to return undefined and login failed with "No active
+    question found for this student" even when a paper was live. The server's
+    isActive flag is the real source of truth; localStorage is just a cache of it.
+  */
   const getActiveQuestion = () => {
     const activeId = localStorage.getItem("activeQuestionsId");
-    return questions.find(q => q.QuestionsId === activeId);
+    return (
+      questions.find(q => q.QuestionsId === activeId) ??
+      questions.find(q => q.isActive)
+    );
   };
 
   const updateQuestionInContext = (updatedQuestion: Question) => {

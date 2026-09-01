@@ -138,105 +138,116 @@ const Login: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white px-4">
-      <div className="w-full bg-blue-400 py-4 text-center text-white text-xl font-bold">
-        CSC-M
-      </div>
-  
-      <div className="relative w-full flex justify-center my-4">
-        <img src="/oau.png" alt="logo" className="w-24 md:w-32 opacity-70" />
-      </div>
-  
-      {showSignUp ? (
-        <div className="w-full max-w-md px-4">
-          <SignUpForm />
-          <button
-            className="mt-4 text-blue-600 underline text-sm"
-            onClick={() => setShowSignUp(false)}
-          >
-            Back to Login
-          </button>
-        </div>
-      ) : (
-        <div className="w-full max-w-md p-6 sm:p-8 bg-blue-50 rounded-lg shadow-md mt-6 sm:mt-10">
-          <p className="text-center text-lg font-semibold text-gray-900 mb-4">
-            LOGIN
-          </p>
-          <form className="space-y-4" onSubmit={formik.handleSubmit}>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Username Matric No.
-              </label>
-              <div className="relative mt-1">
-                <span className="absolute inset-y-0 left-3 flex items-center text-gray-500">
-                  <FaUser />
-                </span>
-                <input
-                  type="text"
-                  name="username"
-                  className="w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
-                  placeholder="Enter your matric number"
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  value={formik.values.username}
-                  required
-                />
-              </div>
-              {formik.touched.username && formik.errors.username && (
-                <p className="text-red-500 text-sm mt-1">
-                  {formik.errors.username}
-                </p>
-              )}
-            </div>
-  
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <div className="relative mt-1">
-                <span className="absolute inset-y-0 left-3 flex items-center text-gray-500">
-                  <FaLock />
-                </span>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  className="w-full pl-10 pr-10 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
-                  placeholder="Enter password"
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  value={formik.values.password}
-                  required
-                />
-                <span
-                  className="absolute inset-y-0 right-3 flex items-center text-gray-500 cursor-pointer"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <AiFillEyeInvisible /> : <AiFillEye />}
-                </span>
-              </div>
-              {formik.touched.password && formik.errors.password && (
-                <p className="text-red-500 text-sm mt-1">
-                  {formik.errors.password}
-                </p>
-              )}
-            </div>
-  
-            {error && (
-              <p className="text-red-500 text-sm text-center">{error}</p>
-            )}
-  
+    <div className="flex min-h-screen flex-col bg-slate-100">
+      <header className="flex items-center justify-center gap-3 bg-navy-900 px-4 py-3">
+        <img src="/oau.png" alt="" className="h-8 w-8" />
+        <span className="text-sm font-semibold tracking-wide text-white">
+          CSCM CodeMirror
+        </span>
+      </header>
+
+      <main className="flex flex-1 items-center justify-center px-4 py-10">
+        {showSignUp ? (
+          <div className="w-full max-w-md">
+            <SignUpForm />
             <button
-              type="submit"
-              className="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+              className="mt-4 text-sm font-medium text-navy-700 underline hover:text-navy-800"
+              onClick={() => setShowSignUp(false)}
             >
-              Login
+              Back to login
             </button>
-          </form>
-        </div>
-      )}
+          </div>
+        ) : (
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-7 shadow-sm sm:p-8">
+            <div className="mb-6 flex flex-col items-center text-center">
+              <img src="/oau.png" alt="OAU crest" className="mb-3 h-16 w-16" />
+              <h1 className="text-xl font-semibold text-navy-900">Sign in</h1>
+              <p className="mt-1 text-sm text-slate-500">
+                Students use their matric number. Staff use their email address.
+              </p>
+            </div>
+
+            <form className="space-y-4" onSubmit={formik.handleSubmit}>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Matric number or email
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+                    <FaUser />
+                  </span>
+                  <input
+                    type="text"
+                    name="username"
+                    className="w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-500/20"
+                    placeholder="e.g. CSC/2021/001"
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    value={formik.values.username}
+                    required
+                  />
+                </div>
+                {formik.touched.username && formik.errors.username && (
+                  <p className="mt-1 text-sm text-red-600">{formik.errors.username}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Password
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+                    <FaLock />
+                  </span>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    className="w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-10 text-sm text-slate-800 placeholder:text-slate-400 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-500/20"
+                    placeholder="Enter password"
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    value={formik.values.password}
+                    required
+                  />
+                  <button
+                    type="button"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <AiFillEyeInvisible /> : <AiFillEye />}
+                  </button>
+                </div>
+                {formik.touched.password && formik.errors.password && (
+                  <p className="mt-1 text-sm text-red-600">{formik.errors.password}</p>
+                )}
+              </div>
+
+              {error && (
+                <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-sm text-red-700">
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={formik.isSubmitting}
+                className="w-full rounded-lg bg-navy-700 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-navy-800 disabled:opacity-60"
+              >
+                {formik.isSubmitting ? "Signing in…" : "Sign in"}
+              </button>
+            </form>
+          </div>
+        )}
+      </main>
+
+      <footer className="pb-6 text-center text-xs text-slate-400">
+        For Learning and Culture
+      </footer>
     </div>
   );
-  
+
 };
 
 export default Login;

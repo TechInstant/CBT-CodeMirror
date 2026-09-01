@@ -152,11 +152,15 @@ export const Th: React.FC<{ children?: ReactNode; className?: string }> = ({
   </th>
 );
 
-export const Td: React.FC<{ children?: ReactNode; className?: string }> = ({
-  children,
-  className = "",
-}) => (
-  <td className={`border-b border-slate-100 px-4 py-3 text-slate-700 ${className}`}>
+export const Td: React.FC<{
+  children?: ReactNode;
+  className?: string;
+  colSpan?: number;
+}> = ({ children, className = "", colSpan }) => (
+  <td
+    colSpan={colSpan}
+    className={`border-b border-slate-100 px-4 py-3 text-slate-700 ${className}`}
+  >
     {children}
   </td>
 );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { python } from "@codemirror/lang-python";
@@ -74,8 +74,10 @@ const blockClipboard = (onBlocked: () => void) =>
     paste:(e) => { e.preventDefault(); onBlocked(); return true; }
   });
 
+const STARTER_CODE = "print('Hello, World!')";
+
 const Editor: React.FC = () => {
-  const [code, setCode] = useState("print('Hello, World!')");
+  const [code, setCode] = useState(STARTER_CODE);
   const [consoleOutput, setConsoleOutput] = useState("");
   const [consoleOpen, setConsoleOpen] = useState(false);
 
@@ -157,8 +159,19 @@ builtins.input = browser_input
   }, [currentIndex]);
 
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const [timerStarted, setTimerStarted] = useState(false);
+  const [endsAt, setEndsAt] = useState<number | null>(null);
   const firstLoad = useRef(false);
+
+  // The paper being sat. Falls back to whichever document the server marks
+  // active, so a student whose localStorage is empty still gets an exam instead
+  // of an endless spinner.
+  const activePaper = useMemo(() => {
+    const activeId = localStorage.getItem("activeQuestionsId");
+    return (
+      questions.find((q) => q.QuestionsId === activeId) ??
+      questions.find((q) => q.isActive)
+    );
+  }, [questions]);
 
   // fetch & restore
   useEffect(() => {
@@ -167,41 +180,48 @@ builtins.input = browser_input
     if (activeId && !localStorage.getItem("assignedQuestions")) {
       fetchAndAssignRandomQuestions(activeId);
     }
-    const saved = localStorage.getItem("examTimeLeft");
-    if (saved) {
-      setTimeLeft(+saved);
-      setTimerStarted(true);
-    }
     firstLoad.current = true;
   }, [fetchAndAssignRandomQuestions]);
 
-  useEffect(() => {
-    if (timerStarted) return;
-    if (questionsLoading || studentQuestions.length === 0) return;
-    const activeId = localStorage.getItem("activeQuestionsId")!;
-    const exam = questions.find((q) => q.QuestionsId === activeId);
-    if (!exam) return;
-    const secs = exam.Duration * 60;
-    setTimeLeft(secs);
-    setTimerStarted(true);
-    localStorage.setItem("examTimeLeft", String(secs));
-  }, [questionsLoading, questions, studentQuestions, timerStarted]);
+  /*
+    The deadline is an absolute timestamp, not a counter that ticks down.
 
+    Previously the remaining seconds were decremented once per second and saved
+    to localStorage, which meant the clock only advanced while the tab was open:
+    closing the tab, sleeping the machine or killing the browser paused the exam,
+    and a student could reopen later with their time intact. Deriving the
+    remaining time from a fixed end instant closes that, and survives a reload.
+
+    It is also keyed to the paper, so a leftover deadline from an earlier sitting
+    is discarded rather than applied to the next one.
+  */
   useEffect(() => {
-    if (!timerStarted || timeLeft == null) return;
-    if (timeLeft <= 0) {
-      handleSubmit("timer");
+    if (endsAt !== null || !activePaper) return;
+
+    const storedPaper = localStorage.getItem("examPaperId");
+    const storedEnd = Number(localStorage.getItem("examEndsAt") ?? 0);
+
+    if (storedPaper === activePaper.QuestionsId && storedEnd > 0) {
+      setEndsAt(storedEnd);
       return;
     }
-    const iv = setInterval(() => {
-      setTimeLeft((t) => {
-        const nxt = (t ?? 0) - 1;
-        localStorage.setItem("examTimeLeft", String(nxt));
-        return nxt;
-      });
-    }, 1000);
+
+    const deadline = Date.now() + activePaper.Duration * 60_000;
+    localStorage.setItem("examEndsAt", String(deadline));
+    localStorage.setItem("examPaperId", activePaper.QuestionsId);
+    setEndsAt(deadline);
+  }, [activePaper, endsAt]);
+
+  // One interval for the life of the deadline. The old effect listed timeLeft as
+  // a dependency, so it tore down and rebuilt the interval every single second.
+  useEffect(() => {
+    if (endsAt === null) return;
+    const tick = () =>
+      setTimeLeft(Math.max(0, Math.round((endsAt - Date.now()) / 1000)));
+    tick();
+    const iv = setInterval(tick, 1000);
     return () => clearInterval(iv);
-  }, [timerStarted, timeLeft]);
+  }, [endsAt]);
 
   const [questionCodeMap, setQuestionCodeMap] = useState<Record<string, string>>({});
   const [questionOutputMap, setQuestionOutputMap] = useState<Record<string, string>>({});
@@ -221,7 +241,7 @@ builtins.input = browser_input
     if (!studentQuestions.length) return;
     const firstId = studentQuestions[0].QuestionsId;
     setCurrentIndex(0);
-    setCode(questionCodeMap[firstId] ?? "print('Hello, World!')");
+    setCode(questionCodeMap[firstId] ?? STARTER_CODE);
     setConsoleOutput(questionOutputMap[firstId] ?? "");
   }, [studentQuestions]);
 
@@ -301,9 +321,25 @@ useEffect(() => {
   async function handleSubmit(reason: AttemptTelemetry["submitReason"] = "manual") {
     if (submittingRef.current) return;
 
-    const paperId = localStorage.getItem("activeQuestionsId");
+    // localStorage first, then the active document, so a cleared browser can
+    // still submit rather than losing the sitting.
+    const paperId =
+      localStorage.getItem("activeQuestionsId") ?? activePaper?.QuestionsId;
     if (!paperId) {
       toast.error("No active paper found — cannot submit.");
+      return;
+    }
+
+    /*
+      Refuse to submit an empty paper. Only one attempt per paper is accepted, so
+      posting zero responses (questions still loading, or a failed fetch) would
+      burn the student's only attempt and lock them out with nothing recorded.
+      Better to keep them in the editor and let them retry.
+    */
+    if (studentQuestions.length === 0) {
+      toast.error(
+        "Your questions have not loaded yet — please wait a moment and try again."
+      );
       return;
     }
 
@@ -367,8 +403,15 @@ useEffect(() => {
       toast.success("Submitted successfully!", { autoClose: 2000 });
       setHasSubmitted(true);
 
-      ["examTimeLeft", "assignedQuestions", "currentQuestionIndex", "userData", "examStartedAt"]
-        .forEach(k => localStorage.removeItem(k));
+      [
+        "examEndsAt",
+        "examPaperId",
+        "assignedQuestions",
+        "currentQuestionIndex",
+        "userData",
+        "examStartedAt",
+        "examTimeLeft", // legacy key from the old countdown
+      ].forEach((k) => localStorage.removeItem(k));
       setTimeout(() => (window.location.href = "/"), 3000);
 
     } catch (err: any) {
@@ -398,55 +441,117 @@ useEffect(() => {
   const handleSubmitRef = useRef(handleSubmit);
   useEffect(() => { handleSubmitRef.current = handleSubmit; });
 
+  // Deadline reached. Declared after the ref so it submits the answers as they
+  // are now, not as they were when the editor mounted. handleSubmit guards
+  // against running twice.
+  useEffect(() => {
+    if (timeLeft === null || timeLeft > 0) return;
+    handleSubmitRef.current("timer");
+  }, [timeLeft]);
+
   const handleClearConsole = () => setConsoleOutput("");
 
+  /*
+    Urgency is proportional to the paper's own length. The old rule turned the
+    clock red below fifteen minutes, which on a twenty-minute practical meant it
+    was red for three quarters of the sitting and told students nothing.
+  */
+  const totalSeconds = (activePaper?.Duration ?? 0) * 60;
+  const fraction = totalSeconds > 0 && timeLeft != null ? timeLeft / totalSeconds : 1;
+  const critical = timeLeft != null && (fraction <= 0.1 || timeLeft <= 60);
+  const warning = !critical && fraction <= 0.25;
+
+  const isAnswered = (qid: string) => {
+    const saved = qid === questionId ? code : questionCodeMap[qid];
+    return !!saved && saved.trim() !== "" && saved.trim() !== STARTER_CODE;
+  };
+
   return (
-    <div className="h-screen flex flex-col">
+    <div className="flex h-screen flex-col bg-slate-100">
       {/* header */}
-      <div className="bg-blue-600 text-white p-3 text-center font-bold text-lg sm:text-xl relative">
-        Code Editor
-        <span
-   className={
-      "absolute right-4 top-1 font-mono transition-colors " +
-      (timeLeft != null && timeLeft <= 15 * 60
-        ? "text-red-600"
-        : "text-white")
-    }
-  >
-    🕒{" "}
-    {timeLeft != null
-      ? formatTime(timeLeft)
-      : <FaSpinner className="inline-block animate-spin" />}
-  </span>
-      </div>
+      <header className="flex items-center gap-3 bg-navy-900 px-4 py-3 text-white">
+        <img src="/oau.png" alt="" className="h-8 w-8 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">
+            {activePaper?.CourseTitle ?? "Code Editor"}
+          </p>
+          <p className="text-xs text-navy-200/70">
+            Question {currentIndex + 1} of {studentQuestions.length || "…"}
+          </p>
+        </div>
+        <div
+          className={`flex items-center gap-2 rounded-lg px-3 py-1.5 font-mono text-sm font-semibold tabular-nums transition-colors ${
+            critical
+              ? "animate-pulse bg-red-500 text-white"
+              : warning
+              ? "bg-gold-400 text-navy-900"
+              : "bg-white/10 text-white"
+          }`}
+          title="Time remaining"
+        >
+          <span aria-hidden>🕒</span>
+          {timeLeft != null ? (
+            formatTime(timeLeft)
+          ) : (
+            <FaSpinner className="inline-block animate-spin" />
+          )}
+        </div>
+      </header>
       <ToastContainer />
 
       {/* body */}
-      <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
-        {/* sidebar */}
-        <div className="w-full md:w-1/3 p-4 bg-gray-100 overflow-auto">
-          <h2 className="font-bold">Question {currentIndex + 1}</h2>
-          <div className="mt-2 whitespace-pre-wrap">
+      <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
+        {/* question panel */}
+        <div className="flex w-full flex-col border-b border-slate-200 bg-white md:w-2/5 md:border-b-0 md:border-r lg:w-1/3">
+          {/* Navigator: with a randomized subset, Prev/Next alone gave students
+              no way to see how many were left or which they had attempted. */}
+          {studentQuestions.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 border-b border-slate-200 p-3">
+              {studentQuestions.map((q, i) => (
+                <button
+                  key={q.QuestionsId}
+                  onClick={() => setCurrentIndex(i)}
+                  title={isAnswered(q.QuestionsId) ? "Attempted" : "Not attempted"}
+                  className={`h-8 w-8 rounded-lg text-xs font-semibold transition-colors ${
+                    i === currentIndex
+                      ? "bg-navy-700 text-white"
+                      : isAnswered(q.QuestionsId)
+                      ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                      : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="flex-1 overflow-auto p-4">
             {studentLoading ? (
-              <div className="flex items-center justify-center h-20">
-                <FaSpinner className="animate-spin text-3xl text-blue-600" />
+              <div className="flex h-24 items-center justify-center">
+                <FaSpinner className="animate-spin text-3xl text-navy-700" />
               </div>
             ) : (
-              formatString(questionText)
+              <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+                {formatString(questionText)}
+              </div>
             )}
           </div>
-          <div className="mt-4 flex justify-between">
+
+          <div className="flex justify-between gap-2 border-t border-slate-200 p-3">
             <button
               onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
               disabled={currentIndex === 0}
-              className="bg-gray-300 px-3 py-1 rounded disabled:opacity-50"
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-40"
             >
               Previous
             </button>
             <button
-              onClick={() => setCurrentIndex((i) => Math.min(studentQuestions.length - 1, i + 1))}
+              onClick={() =>
+                setCurrentIndex((i) => Math.min(studentQuestions.length - 1, i + 1))
+              }
               disabled={currentIndex >= studentQuestions.length - 1}
-              className="bg-gray-300 px-3 py-1 rounded disabled:opacity-50"
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-40"
             >
               Next
             </button>
@@ -454,76 +559,108 @@ useEffect(() => {
         </div>
 
         {/* editor + console */}
-        <div className="w-full md:w-2/3 flex flex-col p-4 overflow-hidden">
-          <div className="mb-4 flex space-x-4">
-            <select onChange={(e) => setTheme(themeMap[e.target.value as keyof typeof themeMap])}>
+        <div className="flex w-full flex-1 flex-col overflow-hidden p-3 md:w-3/5 lg:w-2/3">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <select
+              onChange={(e) => setTheme(themeMap[e.target.value as keyof typeof themeMap])}
+              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-navy-500 focus:outline-none"
+            >
               {Object.keys(themeMap).map((t) => (
                 <option key={t} value={t}>
                   {t}
                 </option>
               ))}
             </select>
-            <select onChange={(e) => setLanguage(languageMap[e.target.value as keyof typeof languageMap])}>
+            <select
+              onChange={(e) =>
+                setLanguage(languageMap[e.target.value as keyof typeof languageMap])
+              }
+              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-navy-500 focus:outline-none"
+            >
               {Object.keys(languageMap).map((l) => (
                 <option key={l} value={l}>
                   {l}
                 </option>
               ))}
             </select>
+            {!consoleOpen && (
+              <button
+                onClick={() => setConsoleOpen(true)}
+                className="ml-auto rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+              >
+                Show console
+              </button>
+            )}
           </div>
-          <div className="flex-1 overflow-hidden border rounded">
-          <CodeMirror 
-          value={code} 
-          height="300px" 
-          extensions={[language, clipboardGuard]}
-          theme={theme} 
-          onChange={setCode} />
+
+          {/* height="100%" so the editor fills the pane; it was pinned to 300px
+              inside a flex-1 container, leaving dead space below on tall screens. */}
+          <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-slate-300">
+            <CodeMirror
+              value={code}
+              height="100%"
+              className="h-full text-sm"
+              extensions={[language, clipboardGuard]}
+              theme={theme}
+              onChange={setCode}
+            />
           </div>
+
           {consoleOpen && (
-            <div className="mt-2 bg-black text-white p-2 h-40 overflow-auto rounded font-mono text-sm flex flex-col">
-              <div className="flex justify-between items-center mb-2">
-                <p className="text-lg font-semibold">Console Output:</p>
-                <div className="space-x-2">
+            <div className="mt-3 flex h-44 shrink-0 flex-col overflow-hidden rounded-lg bg-slate-900">
+              <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                  Console
+                </p>
+                <div className="flex gap-1">
                   <button
                     onClick={handleClearConsole}
-                    className="px-2 py-1 text-sm text-red-500 hover:underline hover:bg-gray-700 rounded"
+                    className="rounded px-2 py-1 text-xs text-slate-300 hover:bg-white/10"
                   >
                     Clear
                   </button>
                   <button
-                    onClick={() => setConsoleOpen(!consoleOpen)}
-                    className="px-2 py-1 text-white hover:bg-gray-700 rounded"
+                    onClick={() => setConsoleOpen(false)}
+                    className="rounded px-2 py-1 text-xs text-slate-300 hover:bg-white/10"
                   >
                     Hide
                   </button>
                 </div>
               </div>
-              <pre className="flex-1 overflow-auto">{consoleOutput}</pre>
+              <pre className="flex-1 overflow-auto px-3 py-2 font-mono text-xs text-slate-100">
+                {consoleOutput || "Run your code to see output here."}
+              </pre>
             </div>
           )}
-
         </div>
       </div>
 
       {/* footer */}
-      <div className="p-4 flex justify-end space-x-4 bg-white border-t">
-        <button
-          disabled={!pyodide}
-          onClick={handleRunCode}
-          className="px-4 py-2 bg-gray-400 text-white rounded disabled:opacity-50"
-        >
-          {pyodide ? "Run Code" : "Loading Python..."}
-        </button>
-        <button
-          onClick={() => handleSubmit("manual")}
-          disabled={hasSubmitted}
-          className={`px-4 py-2 text-white rounded ${
-            hasSubmitted ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
-          }`}
-        >
-          {hasSubmitted ? "Submitted" : "Submit"}
-        </button>
-      </div>
+      <footer className="flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3">
+        <p className="hidden text-xs text-slate-500 sm:block">
+          Copy and paste are disabled. Leaving this tab submits your work.
+        </p>
+        <div className="ml-auto flex gap-2">
+          <button
+            disabled={!pyodide}
+            onClick={handleRunCode}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {pyodide ? "Run code" : "Loading Python…"}
+          </button>
+          <button
+            onClick={() => handleSubmit("manual")}
+            disabled={hasSubmitted}
+            className={`rounded-lg px-5 py-2 text-sm font-semibold text-white transition-colors ${
+              hasSubmitted
+                ? "cursor-not-allowed bg-slate-400"
+                : "bg-navy-700 hover:bg-navy-800"
+            }`}
+          >
+            {hasSubmitted ? "Submitted" : "Submit"}
+          </button>
+        </div>
+      </footer>
     </div>
   );
 };

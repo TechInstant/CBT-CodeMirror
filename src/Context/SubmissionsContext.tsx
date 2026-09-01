@@ -9,17 +9,35 @@ export interface QuestionResponse {
   code: string;
   output: string;
   score: number;
+  totalScore?: number;
+  grading?: {
+    model: string;
+    rawResponse: string;
+    latencyMs: number;
+    attempts: number;
+    gradedAt: string;
+    error?: string;
+  };
 }
+
+export type GradingStatus = "pending" | "graded" | "failed";
+
+export interface Attempt {
+  timestamp: string;
+  responses: QuestionResponse[];
+  manualOverrides: Record<string, number>;
+  // Grading happens out of band, so an attempt can exist before it has marks.
+  paperId?: string;
+  gradingStatus?: GradingStatus;
+  gradingError?: string;
+}
+
 export interface SubmissionDocument {
   id: string;
   studentId: string;
   studentName: string;
   department: string;
-  attempts: Array<{
-    timestamp: string;
-    responses: QuestionResponse[];
-    manualOverrides: Record<string, number>;
-  }>;
+  attempts: Attempt[];
 }
 
 interface SubmissionsContextType {

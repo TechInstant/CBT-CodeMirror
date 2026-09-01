@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import LogoutModal from "../auth/LogoutModal"; 
+import { AlertTriangle, LogOut, Play } from "lucide-react";
+import LogoutModal from "../auth/LogoutModal";
 import { Student } from "../Context/StudentContext";
 import { useQuestions } from "../Context/QuestionContext";
 
@@ -14,8 +15,7 @@ const WelcomePage: React.FC = () => {
   const activeId = localStorage.getItem("activeQuestionsId");
   const activeCourseFromContext = questions.find((q) => q.isActive);
   const activeCourse =
-    questions.find((q) => q.QuestionsId === activeId) ||
-    activeCourseFromContext;
+    questions.find((q) => q.QuestionsId === activeId) || activeCourseFromContext;
 
   useEffect(() => {
     const stored = localStorage.getItem("userData");
@@ -34,94 +34,130 @@ const WelcomePage: React.FC = () => {
     ? "Loading…"
     : "No Course Available";
 
+  const rules = [
+    "This session is monitored.",
+    "Copying and pasting is disabled in the editor.",
+    "Leaving or switching tabs submits your work automatically.",
+    "You may submit each paper once.",
+  ];
+
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-white/10">
-      {/* Sidebar */}
-      <nav className="w-full md:w-1/4 bg-blue-600/80 p-4 flex flex-col gap-2">
+    <div className="flex min-h-screen flex-col bg-slate-100">
+      <header className="flex items-center gap-3 bg-navy-900 px-4 py-3">
+        <img src="/oau.png" alt="" className="h-8 w-8" />
+        <span className="flex-1 text-sm font-semibold text-white">
+          CSCM CodeMirror
+        </span>
         <button
-          className="w-full py-2 bg-white text-gray-700 rounded-md"
-          onClick={() => navigate("/")}
-        >
-          Home
-        </button>
-        <button
-          className="w-full py-2 bg-white text-gray-700 rounded-md font-semibold"
-          onClick={() => navigate("/practice")}
-        >
-          Practice Questions
-        </button>
-        <button
-          className="w-full py-2 bg-white text-gray-700 rounded-md"
           onClick={() => setIsModalOpen(true)}
+          className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-navy-100/80 transition-colors hover:bg-white/10 hover:text-white"
         >
+          <LogOut className="h-4 w-4" />
           Log out
         </button>
-      </nav>
+      </header>
 
-      {/* Main Content */}
-      <main className="flex-1 flex items-center justify-center p-4">
-      <div className="w-full md:w-2/3 bg-white/90 p-6 rounded-lg shadow-lg text-center">
-          <h1 className="text-2xl font-bold mb-4">Welcome</h1>
-          <p className="text-lg font-semibold">
-            Name: {user ? `${user.FirstName} ${user.LastName}` : "Student"}
-          </p>
-          <p className="text-lg font-semibold">
-            Department: {user?.Department || "Not Available"}
-          </p>
-          <h2 className="mt-4 text-xl font-bold">{courseTitle}</h2>
-          <button
-            className="mt-6 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
-            onClick={() =>
-              activeCourse
-                ? navigate("/editor", { state: { courseTitle } })
-                : alert("No active course available.")
-            }
-          >
-            Start Coding
-          </button>
+      <main className="flex flex-1 items-center justify-center px-4 py-10">
+        <div className="w-full max-w-xl">
+          <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm sm:p-8">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Welcome
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold text-navy-900">
+              {user ? `${user.FirstName} ${user.LastName}` : "Student"}
+            </h1>
+
+            <dl className="mt-6 grid grid-cols-1 gap-4 border-y border-slate-100 py-5 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-slate-500">
+                  Matric number
+                </dt>
+                <dd className="mt-0.5 font-mono text-sm text-navy-900">
+                  {user?.StudentId ?? "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-slate-500">
+                  Department
+                </dt>
+                <dd className="mt-0.5 text-sm text-navy-900">
+                  {user?.Department || "Not available"}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-xs uppercase tracking-wide text-slate-500">
+                  Paper
+                </dt>
+                <dd className="mt-0.5 text-sm font-medium text-navy-900">
+                  {courseTitle}
+                  {activeCourse && (
+                    <span className="ml-2 text-xs font-normal text-slate-500">
+                      · {activeCourse.Duration} minutes
+                    </span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+
+            <button
+              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-navy-700 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-navy-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+              disabled={!activeCourse}
+              onClick={() =>
+                activeCourse && navigate("/editor", { state: { courseTitle } })
+              }
+            >
+              <Play className="h-4 w-4" />
+              {activeCourse ? "Start coding" : "No active paper"}
+            </button>
+            {activeCourse && (
+              <p className="mt-2 text-center text-xs text-slate-500">
+                Your timer starts as soon as you open the editor.
+              </p>
+            )}
+          </div>
+
+          <div className="mt-4 rounded-xl border border-gold-200 bg-gold-50 p-4">
+            <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-gold-800">
+              <AlertTriangle className="h-4 w-4" />
+              Before you begin
+            </p>
+            <ul className="space-y-1.5 text-sm text-gold-800/90">
+              {rules.map((r) => (
+                <li key={r} className="flex gap-2">
+                  <span aria-hidden>•</span>
+                  {r}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </main>
 
-      {/* Logout Modal */}
       {isModalOpen && (
-        <LogoutModal onClose={() => setIsModalOpen(false)} onConfirm={handleLogout}/>
+        <LogoutModal onClose={() => setIsModalOpen(false)} onConfirm={handleLogout} />
       )}
 
-      {/* Desktop Warning (bottom-right) */}
-      <div className="hidden md:block absolute bottom-4 right-4 bg-red-100 text-red-800 border border-red-300 p-4 rounded-lg shadow-md text-sm max-w-xs">
-        <p className="font-semibold mb-1">⚠️ Monitoring Notice</p>
-        <ul className="list-disc list-inside space-y-1">
-          <li>This exam is being monitored.</li>
-          <li>Your camera is on.</li>
-          <li>Changing tabs will auto-submit and log you out.</li>
-        </ul>
-      </div>
-
-      {/* Mobile Warning Modal */}
+      {/* Same rules, shown once on small screens where the panel is easy to miss */}
       {showWarning && (
-         <div className="fixed inset-0 bg-black/50 flex items-center justify-center md:hidden z-20">
-          <div className="bg-white rounded-lg p-6 mx-4 w-full max-w-sm">
-            <div className="flex justify-between items-center mb-4">
-              <p className="font-semibold text-red-600">⚠️ Monitoring Notice</p>
-              <button
-                onClick={() => setShowWarning(false)}
-                className="text-gray-500 hover:text-gray-700"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <ul className="list-disc list-inside space-y-2 text-sm text-gray-700">
-              <li>This exam is being monitored.</li>
-              <li>Your camera is on.</li>
-              <li>Copying and pasting will be detected.</li>
-              <li>Changing tabs will auto-submit and log you out.</li>
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-navy-950/50 p-4 md:hidden">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6">
+            <p className="mb-4 flex items-center gap-2 font-semibold text-gold-700">
+              <AlertTriangle className="h-5 w-5" />
+              Before you begin
+            </p>
+            <ul className="space-y-2 text-sm text-slate-700">
+              {rules.map((r) => (
+                <li key={r} className="flex gap-2">
+                  <span aria-hidden>•</span>
+                  {r}
+                </li>
+              ))}
             </ul>
             <button
               onClick={() => setShowWarning(false)}
-              className="mt-6 w-full py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition"
+              className="mt-6 w-full rounded-lg bg-navy-700 py-2.5 text-sm font-semibold text-white hover:bg-navy-800"
             >
-              Got It
+              Got it
             </button>
           </div>
         </div>

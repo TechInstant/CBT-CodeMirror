@@ -2,7 +2,11 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { Download, X, FileText } from "lucide-react";
-import { useSubmissions, QuestionResponse } from "../Context/SubmissionsContext";
+import {
+  useSubmissions,
+  QuestionResponse,
+  GradingStatus,
+} from "../Context/SubmissionsContext";
 import { baseUrl, GetToken } from "../App";
 import {
   Card,
@@ -28,6 +32,7 @@ interface FlatSubmission {
   timestamp: string;
   responses: QuestionResponse[];
   manualOverrides: Record<string, number>;
+  gradingStatus?: GradingStatus;
 }
 
 const TeacherSubmissions: React.FC = () => {
@@ -53,6 +58,7 @@ const TeacherSubmissions: React.FC = () => {
           timestamp: att.timestamp,
           responses: att.responses,
           manualOverrides: att.manualOverrides || {},
+          gradingStatus: att.gradingStatus,
         });
       })
     );
@@ -86,11 +92,12 @@ const TeacherSubmissions: React.FC = () => {
   }, [flat, searchTerm, selectedDept]);
 
   /*
-    NOTE: this divides by count * 100, but the grader scores each answer out of
-    10 (totalScore is 10), so "Scaled" comes out ten times lower than intended
-    and currently just mirrors "Avg". Left exactly as it was, because it decides
-    the marks students receive and that is not a change to make silently — see
-    the handover note. The correct denominator is the response's own totalScore.
+    The denominator is the sum of each answer's own totalScore (10 per question,
+    as the grader marks out of 10), not a hardcoded 100 per question. The old
+    formula divided by count * 100, which made "Scaled" ten times too low — it
+    silently produced a mark out of 10 while claiming to be out of maxScore, and
+    happened to equal "Avg". Reading totalScore also means the figure stays right
+    if the per-question mark ever changes.
   */
   const scoreFor = (s: FlatSubmission) => {
     const total = s.responses.reduce(
@@ -98,9 +105,13 @@ const TeacherSubmissions: React.FC = () => {
       0
     );
     const count = s.responses.length;
-    const scaled = ((count ? total / (count * 100) : 0) * maxScore).toFixed(2);
+    const obtainable = s.responses.reduce(
+      (sum, r) => sum + (typeof r.totalScore === "number" ? r.totalScore : 10),
+      0
+    );
+    const scaled = ((obtainable ? total / obtainable : 0) * maxScore).toFixed(2);
     const avg = count ? (total / count).toFixed(2) : "0.00";
-    return { total, count, scaled, avg };
+    return { total, count, obtainable, scaled, avg };
   };
 
   const saveOverrides = async (sub: FlatSubmission) => {
@@ -223,7 +234,10 @@ const TeacherSubmissions: React.FC = () => {
             </thead>
             <tbody>
               {displayed.map(s => {
-                const { total, count, scaled, avg } = scoreFor(s);
+                const { total, count, obtainable, scaled, avg } = scoreFor(s);
+                // Grading is asynchronous, so an ungraded attempt legitimately
+                // has zeroes. Showing those as marks would misreport the student.
+                const ungraded = s.gradingStatus === "pending";
                 return (
                   <tr
                     key={s.docId}
@@ -239,9 +253,20 @@ const TeacherSubmissions: React.FC = () => {
                     </Td>
                     <Td>{s.attemptIndex + 1}</Td>
                     <Td>{count}</Td>
-                    <Td className="font-medium">{total}</Td>
-                    <Td>{scaled}</Td>
-                    <Td>{avg}</Td>
+                    {ungraded ? (
+                      <Td colSpan={3}>
+                        <Badge tone="gold">Awaiting grading</Badge>
+                      </Td>
+                    ) : (
+                      <>
+                        <Td className="font-medium">
+                          {total}
+                          <span className="text-slate-400"> / {obtainable}</span>
+                        </Td>
+                        <Td>{scaled}</Td>
+                        <Td>{avg}</Td>
+                      </>
+                    )}
                   </tr>
                 );
               })}
