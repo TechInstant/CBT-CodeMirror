@@ -34,10 +34,14 @@ const WelcomePage: React.FC = () => {
     ? "Loading…"
     : "No Course Available";
 
+  // These are shown to students as the rules of the sitting, so they have to
+  // describe what the editor actually does. Two of them no longer did: the
+  // clipboard is allowed now, and switching tabs is recorded rather than
+  // submitting the paper.
   const rules = [
-    "This session is monitored.",
-    "Copying and pasting is disabled in the editor.",
-    "Leaving or switching tabs submits your work automatically.",
+    "This session is monitored, including tab switches.",
+    "Your work is submitted when you press Submit, or when the time runs out.",
+    "The timer keeps running if you close, reload or leave the page.",
     "You may submit each paper once.",
   ];
 

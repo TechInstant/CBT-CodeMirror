@@ -385,12 +385,18 @@ output
 
 useEffect(() => {
   const onBeforeUnload = () => { isUnloading.current = true; };
+  /*
+    Switching away no longer submits the paper. It is recorded instead.
+
+    Auto-submitting on the first hidden tab was severe and fired on things a
+    student does not control — a notification taking focus, the screen locking,
+    an OS alert — ending the exam irrecoverably, since only one attempt per paper
+    is accepted. The count still reaches the invigilator and the analysis, so the
+    behaviour remains visible without being punished automatically.
+  */
   const onVisibilityChange = () => {
     if (document.visibilityState === "hidden" && !isUnloading.current) {
       tabSwitchCountRef.current += 1;
-      // Via the ref: this listener is registered once, so calling handleSubmit
-      // directly would submit the answers as they stood at mount time.
-      handleSubmitRef.current("tab-switch");
     }
   };
   window.addEventListener("beforeunload", onBeforeUnload);
@@ -412,7 +418,7 @@ useEffect(() => {
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [submitError, setSubmitError] = useState("");
   const hasSubmitted = submitState === "done";
-  // The button, the timer and the tab-switch handler can all fire; only one may win.
+  // The button and the timer can both fire; only one may win.
   const submittingRef = useRef(false);
 
   async function handleSubmit(reason: AttemptTelemetry["submitReason"] = "manual") {
@@ -804,8 +810,8 @@ useEffect(() => {
           </p>
         ) : (
           <p className="hidden text-xs text-slate-500 sm:block">
-            Leaving this tab submits your work. The timer keeps running if you
-            close or reload the page.
+            Your work is only submitted when you press Submit, or when the time
+            runs out. The timer keeps running if you close or reload the page.
           </p>
         )}
         <div className="ml-auto flex gap-2">
