@@ -2,7 +2,7 @@ import React, { useState, useContext } from "react";
 import axios from "axios";
 import { CSVLink } from "react-csv";
 import { toast } from "react-toastify";
-import { Download, Pencil, Trash2, Check, X, Users } from "lucide-react";
+import { Download, Pencil, Trash2, Check, X, Users, UserPlus } from "lucide-react";
 import { baseUrl, GetToken } from "../App";
 import { StudentsContext, Student } from "../Context/StudentContext";
 import {
@@ -15,6 +15,7 @@ import {
   Td,
   EmptyState,
   Badge,
+  Modal,
 } from "./ui";
 
 const StudentList: React.FC = () => {
@@ -28,6 +29,57 @@ const StudentList: React.FC = () => {
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Student>>({});
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [newStudent, setNewStudent] = useState({
+    StudentId: "",
+    FirstName: "",
+    LastName: "",
+    Department: "",
+    Email: "",
+  });
+
+  /*
+    Adding one student, without re-uploading the whole roster. A latecomer or a
+    correction during a live sitting previously meant preparing another CSV.
+    Password mirrors the CSV import, which uses the surname.
+  */
+  const handleAddStudent = async () => {
+    if (!newStudent.StudentId.trim() || !newStudent.LastName.trim()) {
+      toast.error("Matric number and last name are required.");
+      return;
+    }
+    setAdding(true);
+    try {
+      const idToken = await GetToken();
+      const payload = {
+        ...newStudent,
+        StudentId: newStudent.StudentId.trim(),
+        Role: "Student",
+        Password: newStudent.LastName.trim(),
+      };
+      await axios.post(`${baseUrl}/students`, payload, {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      setStudents((prev) => [...prev, { ...payload, Scores: 0 } as Student]);
+      setShowAdd(false);
+      setNewStudent({
+        StudentId: "",
+        FirstName: "",
+        LastName: "",
+        Department: "",
+        Email: "",
+      });
+      toast.success("Student added");
+    } catch (error: any) {
+      toast.error(
+        "Could not add student: " +
+          (error?.response?.data?.error || error?.message || "unknown error")
+      );
+    } finally {
+      setAdding(false);
+    }
+  };
 
   const filteredStudents = students.filter((student) =>
     [student.FirstName, student.LastName, student.StudentId, student.Department]
@@ -114,14 +166,100 @@ const StudentList: React.FC = () => {
           searchTerm ? ` · ${filteredStudents.length} matching` : ""
         }`}
         actions={
-          <CSVLink data={students} filename="students_results.csv">
-            <Button variant="secondary" size="sm">
-              <Download className="h-4 w-4" />
-              Export CSV
+          <>
+            <Button size="sm" onClick={() => setShowAdd(true)}>
+              <UserPlus className="h-4 w-4" />
+              Add student
             </Button>
-          </CSVLink>
+            <CSVLink data={students} filename="students_results.csv">
+              <Button variant="secondary" size="sm">
+                <Download className="h-4 w-4" />
+                Export CSV
+              </Button>
+            </CSVLink>
+          </>
         }
       />
+
+      {showAdd && (
+        <Modal
+          title="Add a student"
+          onClose={() => setShowAdd(false)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setShowAdd(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddStudent} disabled={adding}>
+                {adding ? "Adding…" : "Add student"}
+              </Button>
+            </>
+          }
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block sm:col-span-2">
+              <span className="mb-1 block text-xs font-medium text-slate-600">
+                Matric number *
+              </span>
+              <Input
+                value={newStudent.StudentId}
+                placeholder="CSC/2021/001"
+                onChange={(e) =>
+                  setNewStudent((s) => ({ ...s, StudentId: e.target.value }))
+                }
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-600">
+                First name
+              </span>
+              <Input
+                value={newStudent.FirstName}
+                onChange={(e) =>
+                  setNewStudent((s) => ({ ...s, FirstName: e.target.value }))
+                }
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-600">
+                Last name *
+              </span>
+              <Input
+                value={newStudent.LastName}
+                onChange={(e) =>
+                  setNewStudent((s) => ({ ...s, LastName: e.target.value }))
+                }
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-600">
+                Department
+              </span>
+              <Input
+                value={newStudent.Department}
+                onChange={(e) =>
+                  setNewStudent((s) => ({ ...s, Department: e.target.value }))
+                }
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-600">
+                Email
+              </span>
+              <Input
+                value={newStudent.Email}
+                onChange={(e) =>
+                  setNewStudent((s) => ({ ...s, Email: e.target.value }))
+                }
+              />
+            </label>
+          </div>
+          <p className="mt-3 text-xs text-slate-500">
+            They sign in with their matric number and their last name as the
+            password, the same as students loaded from a CSV.
+          </p>
+        </Modal>
+      )}
 
       <Card>
         <div className="border-b border-slate-200 p-4">

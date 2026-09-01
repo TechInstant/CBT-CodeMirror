@@ -520,13 +520,23 @@ useEffect(() => {
   const handleSubmitRef = useRef(handleSubmit);
   useEffect(() => { handleSubmitRef.current = handleSubmit; });
 
-  // Deadline reached. Declared after the ref so it submits the answers as they
-  // are now, not as they were when the editor mounted. handleSubmit guards
-  // against running twice.
+  /*
+    Deadline reached. Declared after the ref so it submits the answers as they
+    are now, not as they were when the editor mounted; handleSubmit guards
+    against running twice.
+
+    studentQuestions.length is a dependency on purpose. If the deadline has
+    already passed when the editor opens — a stale deadline, or a reload after
+    time ran out — this fires before the questions have loaded, handleSubmit
+    correctly refuses to post an empty paper, and with only timeLeft as a
+    dependency it would never retry: the clock sits at 00:00 and nothing can be
+    submitted. Re-running when the questions arrive closes that.
+  */
   useEffect(() => {
     if (timeLeft === null || timeLeft > 0) return;
+    if (studentQuestions.length === 0) return;
     handleSubmitRef.current("timer");
-  }, [timeLeft]);
+  }, [timeLeft, studentQuestions.length]);
 
   const handleClearConsole = () => setConsoleOutput("");
 

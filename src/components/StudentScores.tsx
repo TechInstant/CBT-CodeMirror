@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
-import { Download, X, FileText } from "lucide-react";
+import { Download, X, FileText, RotateCcw } from "lucide-react";
 import {
   useSubmissions,
   QuestionResponse,
@@ -21,6 +21,7 @@ import {
   Badge,
   EmptyState,
   Loading,
+  Modal,
 } from "./ui";
 
 interface FlatSubmission {
@@ -33,6 +34,7 @@ interface FlatSubmission {
   responses: QuestionResponse[];
   manualOverrides: Record<string, number>;
   gradingStatus?: GradingStatus;
+  paperId?: string;
 }
 
 const TeacherSubmissions: React.FC = () => {
@@ -43,6 +45,8 @@ const TeacherSubmissions: React.FC = () => {
   const [selectedDept, setSelectedDept] = useState<string>("All");
   const [maxScore, setMaxScore] = useState(100);
   const [selected, setSelected] = useState<FlatSubmission | null>(null);
+  const [resetting, setResetting] = useState<string | null>(null);
+  const [confirmResit, setConfirmResit] = useState<FlatSubmission | null>(null);
 
   // Build flat list whenever submissions change
   useEffect(() => {
@@ -59,6 +63,7 @@ const TeacherSubmissions: React.FC = () => {
           responses: att.responses,
           manualOverrides: att.manualOverrides || {},
           gradingStatus: att.gradingStatus,
+          paperId: att.paperId,
         });
       })
     );
@@ -138,6 +143,37 @@ const TeacherSubmissions: React.FC = () => {
     }
   };
 
+  /*
+    Only one attempt per paper is accepted, so a student who submitted by mistake
+    or was cut off has no way back in without this.
+  */
+  const allowResit = async (sub: FlatSubmission) => {
+    if (!sub.paperId) {
+      toast.error("This attempt predates paper tracking and cannot be reset individually.");
+      return;
+    }
+    setResetting(sub.docId);
+    try {
+      const token = await GetToken();
+      const studentDocId = sub.docId.replace(/_\d+$/, "");
+      await axios.delete(
+        `${baseUrl}/submissions/${studentDocId}/attempts/${sub.paperId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      await refresh();
+      setSelected(null);
+      toast.success(`${sub.studentName} can sit this paper again`);
+    } catch (err: any) {
+      toast.error(
+        "Could not reset attempt: " +
+          (err?.response?.data?.message || err?.message || "unknown error")
+      );
+    } finally {
+      setResetting(null);
+      setConfirmResit(null);
+    }
+  };
+
   const downloadCSV = () => {
     const header = ["Name", "Matric", "Department", "Attempt", "Q's", "Total", `Scaled(${maxScore})`, "Avg"];
     const rows = displayed.map(s => {
@@ -165,6 +201,27 @@ const TeacherSubmissions: React.FC = () => {
 
   return (
     <>
+      {confirmResit && (
+        <Modal
+          title="Allow this student to sit again?"
+          onClose={() => setConfirmResit(null)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setConfirmResit(null)}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={() => allowResit(confirmResit)}>
+                Delete attempt
+              </Button>
+            </>
+          }
+        >
+          This permanently deletes <strong>{confirmResit.studentName}</strong>'s
+          attempt at this paper, including their code and marks, so they can start
+          it again. Their attempts at other papers are untouched.
+        </Modal>
+      )}
+
       <PageHeader
         title="Student Scores"
         subtitle={`${flat.length} attempt${flat.length === 1 ? "" : "s"}${
@@ -285,6 +342,15 @@ const TeacherSubmissions: React.FC = () => {
               <div className="flex gap-2">
                 <Button size="sm" onClick={() => saveOverrides(selected)}>
                   Save overrides
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  disabled={resetting === selected.docId}
+                  onClick={() => setConfirmResit(selected)}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  {resetting === selected.docId ? "Resetting…" : "Allow re-sit"}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setSelected(null)}>
                   <X className="h-4 w-4" />
