@@ -31,6 +31,7 @@ interface SubmissionRequest {
   department: string;
   timestamp: string;
   paperId: string;
+  language: string;
   // Scores are assigned server-side. The client sends the work, not the marks.
   responses: {
     QuestionsId: string;
@@ -74,10 +75,15 @@ const blockClipboard = (onBlocked: () => void) =>
     paste:(e) => { e.preventDefault(); onBlocked(); return true; }
   });
 
-const STARTER_CODE = "print('Hello, World!')";
+const STARTER_CODE: Record<string, string> = {
+  python: "print('Hello, World!')",
+  javascript: "console.log('Hello, World!');",
+};
+const isStarter = (s: string) =>
+  Object.values(STARTER_CODE).includes(s.trim());
 
 const Editor: React.FC = () => {
-  const [code, setCode] = useState(STARTER_CODE);
+  const [code, setCode] = useState(STARTER_CODE.python);
   const [consoleOutput, setConsoleOutput] = useState("");
   const [consoleOpen, setConsoleOpen] = useState(false);
 
@@ -139,8 +145,25 @@ builtins.input = browser_input
  
   const themeMap = { "one-dark": oneDark, material, dracula };
   const languageMap = { python: python(), javascript: javascript() };
-  const [theme, setTheme] = useState(oneDark);
-  const [language, setLanguage] = useState(python());
+  type ThemeName = keyof typeof themeMap;
+  type LanguageName = keyof typeof languageMap;
+
+  /*
+    The theme select was uncontrolled — no value bound — so it always showed the
+    first option regardless of what was selected. It is a personal preference,
+    so it stays a student choice and is remembered between sessions.
+
+    The language is not a student choice: the admin sets it on the paper, and the
+    editor follows. Letting students pick it meant a cohort could be answering
+    the same paper in different languages, and the Run button executed Python
+    either way.
+  */
+  const [themeName, setThemeName] = useState<ThemeName>(
+    () => (localStorage.getItem("editorTheme") as ThemeName) || "one-dark"
+  );
+  useEffect(() => {
+    localStorage.setItem("editorTheme", themeName);
+  }, [themeName]);
 
   const {
     questions,
@@ -231,6 +254,13 @@ builtins.input = browser_input
   const questionId = currentQuestion?.QuestionsId;
   const questionText = currentQuestion?.questionText || "";
 
+  // Set by the admin on the paper. Papers created before the field existed fall
+  // back to Python, which is what the editor actually executed anyway.
+  const currentLanguage: LanguageName =
+    activePaper?.Language === "javascript" ? "javascript" : "python";
+  const theme = themeMap[themeName];
+  const language = languageMap[currentLanguage];
+
   useEffect(() => {
     if (!questionId) return;
     setQuestionCodeMap((m) => ({ ...m, [questionId]: code }));
@@ -241,20 +271,68 @@ builtins.input = browser_input
     if (!studentQuestions.length) return;
     const firstId = studentQuestions[0].QuestionsId;
     setCurrentIndex(0);
-    setCode(questionCodeMap[firstId] ?? STARTER_CODE);
+    setCode(questionCodeMap[firstId] ?? STARTER_CODE[currentLanguage]);
     setConsoleOutput(questionOutputMap[firstId] ?? "");
   }, [studentQuestions]);
 
   
+/*
+  Runs the answer in the language selected for this question. Previously every
+  Run went through Pyodide regardless, so choosing JavaScript and pressing Run
+  reported a Python syntax error — the selector changed only the highlighting.
+*/
+const runJavaScript = (source: string): string => {
+  const lines: string[] = [];
+  const format = (args: unknown[]) =>
+    args
+      .map((a) => {
+        if (typeof a === "string") return a;
+        try {
+          return JSON.stringify(a);
+        } catch {
+          return String(a);
+        }
+      })
+      .join(" ");
+
+  const sandboxConsole = {
+    log: (...args: unknown[]) => lines.push(format(args)),
+    error: (...args: unknown[]) => lines.push("Error: " + format(args)),
+    warn: (...args: unknown[]) => lines.push(format(args)),
+    info: (...args: unknown[]) => lines.push(format(args)),
+  };
+
+  try {
+    // console and prompt are passed in rather than left global, so student code
+    // cannot quietly write over the page's own console.
+    const fn = new Function("console", "prompt", `"use strict";\n${source}`);
+    const result = fn(sandboxConsole, window.prompt.bind(window));
+    if (result !== undefined) lines.push(String(result));
+  } catch (err: unknown) {
+    lines.push("Error: " + (err instanceof Error ? err.message : String(err)));
+  }
+
+  return lines.join("\n");
+};
+
 const handleRunCode = async () => {
   setConsoleOpen(true);
-  if (!pyodide) {
-    setConsoleOutput("Python still loading...");
-    return;
-  }
 
   if (questionId) {
     runCountsRef.current[questionId] = (runCountsRef.current[questionId] ?? 0) + 1;
+  }
+
+  if (currentLanguage === "javascript") {
+    const out = runJavaScript(code);
+    setConsoleOutput(out);
+    setQuestionCodeMap((m) => ({ ...m, [questionId]: code }));
+    setQuestionOutputMap((m) => ({ ...m, [questionId]: out }));
+    return;
+  }
+
+  if (!pyodide) {
+    setConsoleOutput("Python still loading...");
+    return;
   }
 
   // Wrap student code to funnel stdout+stderr through StringIO,
@@ -372,6 +450,7 @@ useEffect(() => {
       department,
       timestamp: new Date().toISOString(),
       paperId,
+      language: currentLanguage,
       responses,
       telemetry: {
         startedAt,
@@ -463,7 +542,7 @@ useEffect(() => {
 
   const isAnswered = (qid: string) => {
     const saved = qid === questionId ? code : questionCodeMap[qid];
-    return !!saved && saved.trim() !== "" && saved.trim() !== STARTER_CODE;
+    return !!saved && saved.trim() !== "" && !isStarter(saved);
   };
 
   return (
@@ -561,28 +640,26 @@ useEffect(() => {
         {/* editor + console */}
         <div className="flex w-full flex-1 flex-col overflow-hidden p-3 md:w-3/5 lg:w-2/3">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <select
-              onChange={(e) => setTheme(themeMap[e.target.value as keyof typeof themeMap])}
-              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-navy-500 focus:outline-none"
-            >
-              {Object.keys(themeMap).map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-            <select
-              onChange={(e) =>
-                setLanguage(languageMap[e.target.value as keyof typeof languageMap])
-              }
-              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-navy-500 focus:outline-none"
-            >
-              {Object.keys(languageMap).map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
+            {/* Fixed by the paper, so it is shown rather than offered. */}
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-navy-50 px-2.5 py-1.5 text-xs font-medium text-navy-800">
+              <span className="h-1.5 w-1.5 rounded-full bg-navy-700" />
+              {currentLanguage === "javascript" ? "JavaScript" : "Python"}
+            </span>
+
+            <label className="flex items-center gap-1.5 text-xs text-slate-500">
+              Theme
+              <select
+                value={themeName}
+                onChange={(e) => setThemeName(e.target.value as ThemeName)}
+                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-navy-500 focus:outline-none"
+              >
+                {Object.keys(themeMap).map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </label>
             {!consoleOpen && (
               <button
                 onClick={() => setConsoleOpen(true)}
@@ -641,12 +718,14 @@ useEffect(() => {
           Copy and paste are disabled. Leaving this tab submits your work.
         </p>
         <div className="ml-auto flex gap-2">
+          {/* JavaScript runs in the browser directly, so it does not wait on the
+              Python runtime downloading. */}
           <button
-            disabled={!pyodide}
+            disabled={currentLanguage === "python" && !pyodide}
             onClick={handleRunCode}
             className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
-            {pyodide ? "Run code" : "Loading Python…"}
+            {currentLanguage === "python" && !pyodide ? "Loading Python…" : "Run code"}
           </button>
           <button
             onClick={() => handleSubmit("manual")}

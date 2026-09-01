@@ -9,15 +9,17 @@ import {
   HelpCircle,
   Clock,
   Hash,
+  Code2,
 } from "lucide-react";
 import { baseUrl, GetToken } from "../App";
-import { useQuestions, Question } from "../Context/QuestionContext";
+import { useQuestions, Question, PaperLanguage } from "../Context/QuestionContext";
 import {
   Card,
   CardHeader,
   PageHeader,
   Button,
   Input,
+  Select,
   Badge,
   EmptyState,
   Loading,
@@ -297,6 +299,10 @@ const QuestionsList: React.FC = () => {
                         {q.Duration} min
                       </span>
                       <span>{countQuestions(q)} questions</span>
+                      <span className="inline-flex items-center gap-1">
+                        <Code2 className="h-3 w-3" />
+                        {q.Language === "javascript" ? "JavaScript" : "Python"}
+                      </span>
                     </div>
                   </button>
 
@@ -434,6 +440,24 @@ const QuestionsList: React.FC = () => {
                   value={editedQuestion.Duration}
                   onChange={handleInputChange}
                 />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-slate-600">
+                  Language
+                </span>
+                <Select
+                  value={editedQuestion.Language ?? "python"}
+                  onChange={(e) =>
+                    setEditedQuestion({
+                      ...editedQuestion,
+                      Language: e.target.value as PaperLanguage,
+                    })
+                  }
+                  className="w-full"
+                >
+                  <option value="python">Python</option>
+                  <option value="javascript">JavaScript</option>
+                </Select>
               </label>
             </div>
 

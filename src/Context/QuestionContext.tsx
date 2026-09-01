@@ -7,6 +7,8 @@ export interface StudentQuestion {
   questionText: string;
 }
 
+export type PaperLanguage = "python" | "javascript";
+
 export interface Question {
   QuestionsId: string;
   CourseTitle: string;
@@ -14,6 +16,9 @@ export interface Question {
   Questions: Record<string, string | { QuestionsId: string; questionText: string }>;
   Duration: number;
   MaxAnswerableQuestions?: number;
+  // Set by the admin on the paper; the editor follows it rather than offering
+  // students a choice.
+  Language?: PaperLanguage;
   isActive?: boolean;
   isDeleted?: boolean;
 }

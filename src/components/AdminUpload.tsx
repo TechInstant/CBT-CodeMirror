@@ -12,6 +12,7 @@ import {
   PageHeader,
   Button,
   Input,
+  Select,
   TableWrap,
   Th,
   Td,
@@ -33,6 +34,7 @@ const AdminUpload: React.FC = () => {
   const [courseTitle, setCourseTitle] = useState("");
   const [timer, setTimer] = useState("");
   const [MaxAnswerable, setMaxAnswerable] = useState<number>(0);
+  const [language, setLanguage] = useState<"python" | "javascript">("python");
   const [showMaxInfo, setShowMaxInfo] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0, failed: 0 });
@@ -148,6 +150,7 @@ const AdminUpload: React.FC = () => {
         MaxAnswerable: MaxAnswerable,
         Questions: questionsData,
         CourseCode: "",
+        Language: language,
       };
 
       await axios.post(`${baseUrl}/questions`, questions, {
@@ -426,6 +429,26 @@ const AdminUpload: React.FC = () => {
                   value={timer}
                   onChange={(e) => setTimer(e.target.value)}
                 />
+              </label>
+
+              <label className="block sm:col-span-2">
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Language
+                </span>
+                <Select
+                  value={language}
+                  onChange={(e) =>
+                    setLanguage(e.target.value as "python" | "javascript")
+                  }
+                  className="w-full sm:w-56"
+                >
+                  <option value="python">Python</option>
+                  <option value="javascript">JavaScript</option>
+                </Select>
+                <span className="mt-1.5 block text-xs text-slate-500">
+                  Every student sits this paper in this language; the editor runs
+                  and highlights it accordingly.
+                </span>
               </label>
 
               <div className="sm:col-span-2">
