@@ -83,9 +83,18 @@ export const QuestionsProvider: React.FC<{ children: ReactNode }> = ({ children 
       let qq: StudentQuestion[];
 
       if (raw.length > 0 && typeof raw[0] === "object" && "questionText" in raw[0]) {
-        qq = raw as StudentQuestion[];
+        /*
+          Accept questionId as well as QuestionsId. The CSV importer writes the
+          lowercase form, and taking the items as-is left QuestionsId undefined,
+          which reached the server inside a submission and was rejected by
+          Firestore as an undefined value — a 500 on submit.
+        */
+        qq = (raw as any[]).map((q, i) => ({
+          QuestionsId: String(q?.QuestionsId ?? q?.questionId ?? `Q${i + 1}`),
+          questionText: String(q?.questionText ?? ""),
+        }));
       } else {
-   
+
         qq = (raw as string[]).map((qid) => {
           const entry = activeDoc.Questions[qid];
           const text =
