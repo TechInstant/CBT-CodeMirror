@@ -1,4 +1,4 @@
-import React, { ChangeEvent, useState } from "react";
+import React, { ChangeEvent, useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import {
@@ -10,6 +10,7 @@ import {
   Clock,
   Hash,
   Code2,
+  AlertTriangle,
 } from "lucide-react";
 import { baseUrl, GetToken } from "../App";
 import { useQuestions, Question, PaperLanguage } from "../Context/QuestionContext";
@@ -157,6 +158,68 @@ const QuestionsList: React.FC = () => {
       ...editedQuestion,
       [name]: name === "Duration" ? parseInt(value, 10) || 0 : value,
     });
+  };
+
+  // Questions are stored as an object here, an array once saved; count both.
+  const questionCount = editedQuestion
+    ? Array.isArray(editedQuestion.Questions)
+      ? (editedQuestion.Questions as unknown[]).length
+      : Object.keys(editedQuestion.Questions || {}).length
+    : 0;
+
+  const [assignments, setAssignments] = useState<{
+    issued: number;
+    locked: number;
+    resettable: number;
+  } | null>(null);
+  const [resettingDraws, setResettingDraws] = useState(false);
+
+  // Load the draw count whenever a paper is opened for editing, so the warning
+  // reflects this paper rather than the last one.
+  useEffect(() => {
+    if (!editedQuestion?.QuestionsId) {
+      setAssignments(null);
+      return;
+    }
+    let live = true;
+    (async () => {
+      try {
+        const token = await GetToken();
+        const res = await axios.get(
+          `${baseUrl}/questions/${editedQuestion.QuestionsId}/assignments`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (live) setAssignments(res.data);
+      } catch {
+        if (live) setAssignments(null);
+      }
+    })();
+    return () => { live = false; };
+  }, [editedQuestion?.QuestionsId]);
+
+  const resetDraws = async () => {
+    if (!editedQuestion?.QuestionsId) return;
+    setResettingDraws(true);
+    try {
+      const token = await GetToken();
+      const res = await axios.delete(
+        `${baseUrl}/questions/${editedQuestion.QuestionsId}/assignments`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success(res.data?.message || "Draws cleared");
+      setAssignments({
+        issued: res.data?.keptForSubmitted ?? 0,
+        locked: res.data?.keptForSubmitted ?? 0,
+        resettable: 0,
+      });
+    } catch (err: any) {
+      toast.error(
+        "Could not clear draws: " +
+          (err?.response?.data?.message || err?.message || "unknown error")
+      );
+    } finally {
+      setResettingDraws(false);
+    }
   };
 
   const handleQuestionFieldChange = (key: string, value: string) => {
@@ -459,7 +522,93 @@ const QuestionsList: React.FC = () => {
                   <option value="javascript">JavaScript</option>
                 </Select>
               </label>
+
+              {/* How many of the paper's questions each student is drawn. The
+                  presets cover the common choices; the field takes any number
+                  and the server clamps it to what the paper actually holds. */}
+              <label className="block sm:col-span-2">
+                <span className="mb-1.5 block text-xs font-medium text-slate-600">
+                  Questions per student
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {[1, 2].map((n) => (
+                    <Button
+                      key={n}
+                      type="button"
+                      size="sm"
+                      variant={editedQuestion.MaxAnswerable === n ? "primary" : "secondary"}
+                      onClick={() =>
+                        setEditedQuestion({ ...editedQuestion, MaxAnswerable: n })
+                      }
+                      disabled={questionCount < n}
+                    >
+                      {n}
+                    </Button>
+                  ))}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={
+                      editedQuestion.MaxAnswerable >= questionCount ? "primary" : "secondary"
+                    }
+                    onClick={() =>
+                      setEditedQuestion({ ...editedQuestion, MaxAnswerable: questionCount })
+                    }
+                  >
+                    All {questionCount}
+                  </Button>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={questionCount}
+                    className="w-24"
+                    value={editedQuestion.MaxAnswerable ?? questionCount}
+                    onChange={(e) =>
+                      setEditedQuestion({
+                        ...editedQuestion,
+                        MaxAnswerable: Math.max(
+                          1,
+                          Math.min(questionCount, parseInt(e.target.value, 10) || 1)
+                        ),
+                      })
+                    }
+                  />
+                </div>
+                <p className="mt-1.5 text-xs text-slate-500">
+                  Each student is drawn {editedQuestion.MaxAnswerable ?? questionCount} of{" "}
+                  {questionCount}, at random, once — the same set returns on refresh.
+                </p>
+              </label>
             </div>
+
+            {/* Draws are sticky, so a changed count does not reach anyone who
+                already holds one. Say so plainly and offer the reset. */}
+            {assignments && assignments.issued > 0 && (
+              <div className="mx-5 mb-1 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-medium">
+                    {assignments.issued} student{assignments.issued === 1 ? "" : "s"} already
+                    hold a question set
+                  </p>
+                  <p className="mt-0.5 text-xs">
+                    Changing the count will not affect them. Clearing the draws re-issues a
+                    fresh set on next login.
+                    {assignments.locked > 0 &&
+                      ` ${assignments.locked} already submitted and will keep theirs.`}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={resettingDraws || assignments.resettable === 0}
+                  onClick={resetDraws}
+                >
+                  {resettingDraws ? "Clearing…" : `Clear ${assignments.resettable}`}
+                </Button>
+              </div>
+            )}
 
             <div className="space-y-3 p-5">
               {Object.entries(editedQuestion.Questions).map(([key, value]) => (

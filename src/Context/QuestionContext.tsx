@@ -15,7 +15,10 @@ export interface Question {
   CourseCode?: string;
   Questions: Record<string, string | { QuestionsId: string; questionText: string }>;
   Duration: number;
-  MaxAnswerableQuestions?: number;
+  // How many of the paper's questions each student is drawn. Was declared as
+  // MaxAnswerableQuestions, a name the API never sends and nothing read, so the
+  // value was invisible to the admin screens.
+  MaxAnswerable: number;
   // Set by the admin on the paper; the editor follows it rather than offering
   // students a choice.
   Language?: PaperLanguage;
