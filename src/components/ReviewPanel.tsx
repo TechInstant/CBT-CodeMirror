@@ -198,7 +198,9 @@ const ReviewPanel: React.FC<{
         </div>
       )}
 
-      <TableWrap>
+      {/* Six columns of code and output need more room than the default before
+          shrinking them stops being readable. */}
+      <TableWrap minWidth="60rem">
         <thead>
           <tr>
             <Th className="w-[26%]">Question</Th>

@@ -36,11 +36,13 @@ export const CardHeader: React.FC<{ title: string; actions?: ReactNode }> = ({
   title,
   actions,
 }) => (
-  <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+  // Wraps rather than overflowing: some headers carry three buttons, which do
+  // not fit beside the title on a phone.
+  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5">
     <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
       {title}
     </h2>
-    {actions}
+    {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
   </div>
 );
 
@@ -131,12 +133,25 @@ export const Badge: React.FC<{
 export const TableWrap: React.FC<{
   children: ReactNode;
   maxHeight?: string;
-}> = ({ children, maxHeight }) => (
+  /** Narrowest the table may get before the wrapper scrolls instead. */
+  minWidth?: string;
+}> = ({ children, maxHeight, minWidth = "44rem" }) => (
   <div
-    className="overflow-auto"
+    className="-mx-px overflow-auto"
     style={maxHeight ? { maxHeight } : undefined}
   >
-    <table className="w-full border-collapse text-sm">{children}</table>
+    {/*
+      w-full alone let the table compress to the width of a phone, squeezing
+      columns until they were unreadable rather than scrolling. A minimum width
+      keeps the columns legible and lets the wrapper scroll horizontally, which
+      is what overflow-auto was there for.
+    */}
+    <table
+      className="w-full border-collapse text-sm"
+      style={{ minWidth }}
+    >
+      {children}
+    </table>
   </div>
 );
 

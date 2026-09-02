@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   UploadCloud,
@@ -19,15 +19,35 @@ const navItems = [
   { to: "/StudentScores", label: "Student Scores", Icon: FileText },
 ];
 
+const isDesktop = () =>
+  typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
+
 export default function AdminSidebar() {
+  const location = useLocation();
+
+  /*
+    On desktop the sidebar sits in the page and the remembered preference makes
+    sense. On mobile the same element is a drawer over the content, so starting
+    from a stored `true` covered the whole screen on every load. Mobile always
+    starts closed; the preference is only honoured where it is not a drawer.
+  */
   const [isOpen, setIsOpen] = useState(() => {
+    if (!isDesktop()) return false;
     const stored = localStorage.getItem("admin-sidebar-open");
     return stored === null ? true : JSON.parse(stored);
   });
 
   useEffect(() => {
-    localStorage.setItem("admin-sidebar-open", JSON.stringify(isOpen));
+    if (isDesktop()) {
+      localStorage.setItem("admin-sidebar-open", JSON.stringify(isOpen));
+    }
   }, [isOpen]);
+
+  // Following a link on mobile should reveal the page, not leave the drawer
+  // sitting over it.
+  useEffect(() => {
+    if (!isDesktop()) setIsOpen(false);
+  }, [location.pathname]);
 
   const admin = (() => {
     try {

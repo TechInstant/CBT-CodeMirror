@@ -664,8 +664,11 @@ useEffect(() => {
     );
   }
 
+  // 100dvh rather than h-screen: on mobile browsers the viewport unit behind
+  // h-screen ignores the address bar, so the footer holding Submit sat below the
+  // fold until the bar retracted. dvh tracks the space actually visible.
   return (
-    <div className="flex h-screen flex-col bg-slate-100">
+    <div className="flex h-[100dvh] flex-col bg-slate-100">
       {/* header */}
       <header className="flex items-center gap-3 bg-navy-900 px-4 py-3 text-white">
         <img src="/oau.png" alt="" className="h-8 w-8 shrink-0" />
@@ -699,8 +702,11 @@ useEffect(() => {
 
       {/* body */}
       <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
-        {/* question panel */}
-        <div className="flex w-full flex-col border-b border-slate-200 bg-white md:w-2/5 md:border-b-0 md:border-r lg:w-1/3">
+        {/* Question panel. Capped on mobile: stacked above the editor with equal
+            flex it took half a short viewport and left barely any room to type.
+            It scrolls within the cap, and the constraint lifts at md where the
+            panels sit side by side. */}
+        <div className="flex max-h-[38vh] w-full shrink-0 flex-col border-b border-slate-200 bg-white md:max-h-none md:w-2/5 md:shrink md:border-b-0 md:border-r lg:w-1/3">
           {/* Navigator: with a randomized subset, Prev/Next alone gave students
               no way to see how many were left or which they had attempted. */}
           {studentQuestions.length > 0 && (
@@ -856,20 +862,22 @@ useEffect(() => {
             runs out. The timer keeps running if you close or reload the page.
           </p>
         )}
-        <div className="ml-auto flex gap-2">
+        {/* Full width on a phone so both actions stay comfortably tappable
+            rather than shrinking into the corner. */}
+        <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
           {/* JavaScript runs in the browser directly, so it does not wait on the
               Python runtime downloading. */}
           <button
             disabled={currentLanguage === "python" && !pyodide}
             onClick={handleRunCode}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none sm:py-2"
           >
             {currentLanguage === "python" && !pyodide ? "Loading Python…" : "Run code"}
           </button>
           <button
             onClick={() => handleSubmit("manual")}
             disabled={submitState === "submitting" || hasSubmitted}
-            className={`inline-flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold text-white transition-colors ${
+            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition-colors sm:flex-none sm:py-2 ${
               submitState === "submitting" || hasSubmitted
                 ? "cursor-not-allowed bg-slate-400"
                 : "bg-navy-700 hover:bg-navy-800"
