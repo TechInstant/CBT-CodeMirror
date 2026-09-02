@@ -256,8 +256,15 @@ builtins.input = browser_input
     return () => clearInterval(iv);
   }, [endsAt]);
 
+  // Only the code map is state: the question list reads it to show which
+  // questions have been answered. Saved output is never rendered, so it lives in
+  // its ref alone.
   const [questionCodeMap, setQuestionCodeMap] = useState<Record<string, string>>({});
-  const [questionOutputMap, setQuestionOutputMap] = useState<Record<string, string>>({});
+  // Authoritative copies. State drives rendering; these are what navigation and
+  // submission read, so neither can act on a stale closure.
+  const codeMapRef = useRef<Record<string, string>>({});
+  const outMapRef = useRef<Record<string, string>>({});
+  const prevQuestionIdRef = useRef<string | undefined>(undefined);
 
   // pull out current question
   const currentQuestion: StudentQuestion = studentQuestions[currentIndex]!;
@@ -271,18 +278,45 @@ builtins.input = browser_input
   const theme = themeMap[themeName];
   const language = languageMap[currentLanguage];
 
-  useEffect(() => {
-    if (!questionId) return;
-    setQuestionCodeMap((m) => ({ ...m, [questionId]: code }));
-    setQuestionOutputMap((m) => ({ ...m, [questionId]: consoleOutput }));
-  }, [currentIndex, questionId]);
+  /*
+    Moving between questions: file the code that is on screen under the question
+    it was actually written for, then load whatever was saved for the question
+    being opened.
 
+    The previous version wrote `code` under the NEW questionId, because the effect
+    ran after questionId had already changed. Navigating from A to B therefore
+    stored A's answer as B's, and nothing ever loaded B's own code, so the student
+    was shown A's work against B's question. Any question left untouched kept the
+    previous one's answer and was marked against the wrong task.
+
+    The maps are mirrored in refs because this effect depends only on questionId;
+    reading the state objects directly would see whatever they held when the
+    closure was created, which is not necessarily the latest.
+  */
+  useEffect(() => {
+    const prev = prevQuestionIdRef.current;
+    if (prev === questionId) return;
+
+    if (prev) {
+      codeMapRef.current[prev] = code;
+      outMapRef.current[prev] = consoleOutput;
+      setQuestionCodeMap({ ...codeMapRef.current });
+    }
+
+    if (questionId) {
+      setCode(codeMapRef.current[questionId] ?? STARTER_CODE[currentLanguage]);
+      setConsoleOutput(outMapRef.current[questionId] ?? "");
+    }
+
+    prevQuestionIdRef.current = questionId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questionId]);
+
+  // A freshly loaded paper always opens on its first question; the effect above
+  // then loads that question's code.
   useEffect(() => {
     if (!studentQuestions.length) return;
-    const firstId = studentQuestions[0].QuestionsId;
     setCurrentIndex(0);
-    setCode(questionCodeMap[firstId] ?? STARTER_CODE[currentLanguage]);
-    setConsoleOutput(questionOutputMap[firstId] ?? "");
   }, [studentQuestions]);
 
   
@@ -335,8 +369,9 @@ const handleRunCode = async () => {
   if (currentLanguage === "javascript") {
     const out = runJavaScript(code);
     setConsoleOutput(out);
-    setQuestionCodeMap((m) => ({ ...m, [questionId]: code }));
-    setQuestionOutputMap((m) => ({ ...m, [questionId]: out }));
+    codeMapRef.current[questionId] = code;
+    outMapRef.current[questionId] = out;
+    setQuestionCodeMap({ ...codeMapRef.current });
     return;
   }
 
@@ -371,15 +406,20 @@ sys.stdout, sys.stderr = old_out, old_err
 output
 `;
 
+  // Running files the code and its output against the question on screen, so a
+  // run is not lost if the student navigates away without editing further.
   try {
     const result: string = await pyodide.runPythonAsync(wrapped);
     setConsoleOutput(result);
-    setQuestionCodeMap((m) => ({ ...m, [questionId]: code }));
-    setQuestionOutputMap((m) => ({ ...m, [questionId]: result }));
+    codeMapRef.current[questionId] = code;
+    outMapRef.current[questionId] = result;
+    setQuestionCodeMap({ ...codeMapRef.current });
   } catch (err) {
     const e = String(err);
     setConsoleOutput(e);
-    setQuestionOutputMap((m) => ({ ...m, [questionId]: e }));
+    codeMapRef.current[questionId] = code;
+    outMapRef.current[questionId] = e;
+    setQuestionCodeMap({ ...codeMapRef.current });
   }
 };
 
@@ -450,8 +490,10 @@ useEffect(() => {
     setSubmitState("submitting");
     setSubmitError("");
 
-    const codeMap = { ...questionCodeMap, [questionId]: code };
-    const outMap  = { ...questionOutputMap, [questionId]: consoleOutput };
+    // From the refs, plus the question currently on screen, which has not been
+    // filed yet because that only happens on navigation.
+    const codeMap = { ...codeMapRef.current, [questionId]: code };
+    const outMap  = { ...outMapRef.current, [questionId]: consoleOutput };
 
     // Send the work as-is. Grading happens on the server, where a rate-limited
     // grader can retry instead of quietly recording a zero.
