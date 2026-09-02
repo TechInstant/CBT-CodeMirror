@@ -22,6 +22,16 @@ export interface QuestionResponse {
 
 export type GradingStatus = "pending" | "graded" | "failed";
 
+export interface AttemptReview {
+  instructorId: string;
+  blind: boolean;
+  aiScoreVisibleAtReview: boolean;
+  openedAt: string;
+  submittedAt?: string;
+  // This marker's own scores, so a second marker cannot overwrite the first.
+  scores?: Record<string, { instructorScore: number; overrideReason?: string }>;
+}
+
 export interface Attempt {
   timestamp: string;
   responses: QuestionResponse[];
@@ -32,13 +42,17 @@ export interface Attempt {
   gradingError?: string;
   // Allocated at submission time, before anyone sees the work.
   blindReview?: boolean;
-  review?: {
-    instructorId: string;
-    blind: boolean;
-    aiScoreVisibleAtReview: boolean;
-    openedAt: string;
-    submittedAt?: string;
-  };
+  // The primary marker's pass. Kept for readers that predate multiple markers.
+  review?: AttemptReview;
+  /*
+    Every marking pass, keyed by instructor. Inter-rater reliability needs two
+    independent marks on the same attempt, which a single review object could not
+    hold — the second marker overwrote the first.
+  */
+  reviews?: Record<string, AttemptReview>;
+  primaryInstructorId?: string;
+  // Selected for the inter-rater subset; a second marker is expected.
+  doubleMarked?: boolean;
 }
 
 export interface SubmissionDocument {

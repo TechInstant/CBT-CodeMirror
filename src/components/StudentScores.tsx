@@ -25,6 +25,17 @@ import {
   Modal,
 } from "./ui";
 
+// Whoever is signed in. The review endpoints key marks by this, so the second
+// marker's worklist is "in the subset, marked by someone, not yet by me".
+const currentInstructorId = () => {
+  try {
+    const u = JSON.parse(localStorage.getItem("userData") || "{}");
+    return u.Email || u.UserId || "unknown";
+  } catch {
+    return "unknown";
+  }
+};
+
 interface FlatSubmission {
   docId: string;
   studentId: string;
@@ -35,6 +46,13 @@ interface FlatSubmission {
   responses: QuestionResponse[];
   manualOverrides: Record<string, number>;
   gradingStatus?: GradingStatus;
+  // Selected for the inter-rater subset, and who has marked it so far. Without
+  // these on screen a second marker has no way to find the attempts that need
+  // them, and marks whatever they happen to open — which is how six passes
+  // produced no overlapping pair and nothing to compute kappa from.
+  doubleMarked?: boolean;
+  markers?: string[];
+  markersDone?: number;
   paperId?: string;
   blindReview?: boolean;
   review?: { instructorId: string; openedAt: string; submittedAt?: string };
@@ -51,6 +69,7 @@ const TeacherSubmissions: React.FC = () => {
   const [resetting, setResetting] = useState<string | null>(null);
   const [confirmResit, setConfirmResit] = useState<FlatSubmission | null>(null);
   const [reviewing, setReviewing] = useState<FlatSubmission | null>(null);
+  const [queue, setQueue] = useState<"all" | "unmarked" | "needs-second">("all");
 
   // Build flat list whenever submissions change
   useEffect(() => {
@@ -70,11 +89,27 @@ const TeacherSubmissions: React.FC = () => {
           paperId: att.paperId,
           blindReview: att.blindReview,
           review: att.review,
+          doubleMarked: att.doubleMarked,
+          markers: Object.keys(att.reviews ?? {}),
+          markersDone: Object.values(att.reviews ?? {}).filter(
+            (r: any) => r?.submittedAt
+          ).length,
         });
       })
     );
     setFlat(all);
   }, [submissions]);
+
+  // How many attempts are waiting on the person signed in, for the queue label.
+  const secondMarkerQueue = React.useMemo(() => {
+    const me = currentInstructorId();
+    return flat.filter(
+      f =>
+        f.doubleMarked === true &&
+        (f.markersDone ?? 0) >= 1 &&
+        !(f.markers ?? []).includes(me)
+    ).length;
+  }, [flat]);
 
   // Extract unique departments (for dropdown)
   const departments = React.useMemo(() => {
@@ -87,9 +122,10 @@ const TeacherSubmissions: React.FC = () => {
     return Array.from(setDept).sort();
   }, [flat]);
 
-  // Filter by searchTerm and selectedDept
+  // Filter by searchTerm, department and marking state
   useEffect(() => {
     const term = searchTerm.trim().toLowerCase();
+    const me = currentInstructorId();
     setDisplayed(
       flat.filter(f => {
         const matchTerm =
@@ -97,10 +133,22 @@ const TeacherSubmissions: React.FC = () => {
           f.studentId.toLowerCase().includes(term);
         const matchDept =
           selectedDept === "All" || f.department === selectedDept;
-        return matchTerm && matchDept;
+
+        let matchQueue = true;
+        if (queue === "unmarked") {
+          matchQueue = (f.markersDone ?? 0) === 0;
+        } else if (queue === "needs-second") {
+          // In the inter-rater subset, already marked by someone, and not yet by
+          // whoever is signed in. This is the second marker's worklist.
+          matchQueue =
+            f.doubleMarked === true &&
+            (f.markersDone ?? 0) >= 1 &&
+            !(f.markers ?? []).includes(me);
+        }
+        return matchTerm && matchDept && matchQueue;
       })
     );
-  }, [flat, searchTerm, selectedDept]);
+  }, [flat, searchTerm, selectedDept, queue]);
 
   /*
     The denominator is the sum of each answer's own totalScore (10 per question,
@@ -258,6 +306,18 @@ const TeacherSubmissions: React.FC = () => {
               </option>
             ))}
           </Select>
+          {/* Marking queues. "Needs 2nd marker" is what makes the inter-rater
+              subset findable — without it a second marker opens whatever is in
+              front of them and the two never overlap. */}
+          <Select
+            value={queue}
+            onChange={e => setQueue(e.target.value as typeof queue)}
+            title="Filter by marking state"
+          >
+            <option value="all">All attempts</option>
+            <option value="unmarked">Not yet marked</option>
+            <option value="needs-second">Needs 2nd marker ({secondMarkerQueue})</option>
+          </Select>
           <label className="flex items-center gap-2 text-sm text-slate-600">
             Max score
             <Input
@@ -332,15 +392,23 @@ const TeacherSubmissions: React.FC = () => {
                       </>
                     )}
                     <Td>
-                      {s.review?.submittedAt ? (
-                        <Badge tone="green">
-                          Reviewed{s.blindReview ? " (blind)" : ""}
-                        </Badge>
-                      ) : s.blindReview ? (
-                        <Badge tone="navy">Blind</Badge>
-                      ) : (
-                        <Badge tone="slate">Sighted</Badge>
-                      )}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {(s.markersDone ?? 0) > 0 ? (
+                          <Badge tone="green">
+                            Marked ×{s.markersDone}
+                            {s.blindReview ? " (blind)" : ""}
+                          </Badge>
+                        ) : s.blindReview ? (
+                          <Badge tone="navy">Blind</Badge>
+                        ) : (
+                          <Badge tone="slate">Sighted</Badge>
+                        )}
+                        {/* Only worth flagging while a second mark is still
+                            outstanding; once two are in it is done. */}
+                        {s.doubleMarked && (s.markersDone ?? 0) < 2 && (
+                          <Badge tone="gold">2nd marker</Badge>
+                        )}
+                      </div>
                     </Td>
                   </tr>
                 );
